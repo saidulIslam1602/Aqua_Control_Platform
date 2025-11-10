@@ -271,6 +271,108 @@ Think of `Entity<TId>` like a **birth certificate**:
 
 ---
 
+## 14. Common Mistakes to Avoid
+
+### ❌ Don't: Modify ID After Creation
+```csharp
+// ❌ Bad - trying to change ID
+var tank = new Tank(Guid.NewGuid());
+tank.Id = Guid.NewGuid(); // ❌ Compiler error - setter is protected
+```
+
+### ✅ Do: Set ID in Constructor
+```csharp
+// ✅ Good - ID set once in constructor
+var tankId = Guid.NewGuid();
+var tank = new Tank(tankId);
+// ID cannot be changed after creation
+```
+
+### ❌ Don't: Compare Entities by Properties
+```csharp
+// ❌ Bad - comparing by properties
+if (tank1.Name == tank2.Name && tank1.Capacity == tank2.Capacity)
+{
+    // This is wrong! Entities are compared by ID
+}
+```
+
+### ✅ Do: Compare Entities by ID
+```csharp
+// ✅ Good - comparing by ID
+if (tank1 == tank2)  // Uses ID-based equality
+{
+    // Correct comparison
+}
+```
+
+### ❌ Don't: Directly Modify DomainEvents Collection
+```csharp
+// ❌ Bad - trying to modify read-only collection
+var events = tank.DomainEvents;
+events.Add(new SomeEvent()); // ❌ Compiler error - collection is read-only
+```
+
+### ✅ Do: Use AddDomainEvent() Method
+```csharp
+// ✅ Good - use controlled method
+tank.AddDomainEvent(new WaterLevelLowEvent(...));
+```
+
+### ❌ Don't: Forget to Clear Events After Publishing
+```csharp
+// ❌ Bad - events accumulate
+tank.AddDomainEvent(new Event1());
+// ... later ...
+tank.AddDomainEvent(new Event2());
+// Events keep accumulating, never cleared
+```
+
+### ✅ Do: Clear Events After Publishing
+```csharp
+// ✅ Good - clear after publishing
+tank.AddDomainEvent(new WaterLevelLowEvent(...));
+// ... save to database ...
+await mediator.Publish(domainEvent);
+tank.ClearDomainEvents(); // ✅ Clear after publishing
+```
+
+### ❌ Don't: Use Entity Without ID
+```csharp
+// ❌ Bad - entity without ID
+public class Tank : Entity<Guid>
+{
+    public Tank() { } // ❌ Missing ID initialization
+    // ID will be default(Guid) = empty GUID
+}
+```
+
+### ✅ Do: Always Initialize ID
+```csharp
+// ✅ Good - ID always initialized
+public class Tank : Entity<Guid>
+{
+    public Tank(Guid id) : base(id) { } // ✅ ID provided
+    protected Tank() { } // For EF Core only
+}
+```
+
+### ❌ Don't: Expose Mutable Collections
+```csharp
+// ❌ Bad - exposes mutable list
+public List<IDomainEvent> DomainEvents { get; set; }
+// External code can modify directly
+```
+
+### ✅ Do: Expose Read-Only Collections
+```csharp
+// ✅ Good - read-only collection
+public IReadOnlyList<IDomainEvent> DomainEvents => _domainEvents.AsReadOnly();
+// External code can only read, not modify
+```
+
+---
+
 ## Summary
 
 The `Entity<TId>` base class provides:
