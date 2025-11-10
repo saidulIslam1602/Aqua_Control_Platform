@@ -971,7 +971,304 @@ Value objects are a **powerful tool** in Domain-Driven Design:
 **In your AquaCulture Platform**:
 - Use `TankCapacity` instead of `decimal capacity + string unit`
 - Use `Location` instead of separate building/room/zone strings
+- Use `WaterQualityParameters` instead of scattered water quality values
 - Create more value objects as you discover domain concepts that are defined by their attributes
+
+---
+
+## 27. WaterQualityParameters Value Object - Deep Dive
+
+### Purpose
+
+The `WaterQualityParameters` value object encapsulates all water quality measurements for an aquaculture tank. It represents the optimal and acceptable ranges for temperature, pH, dissolved oxygen, and salinity.
+
+### Structure
+
+```csharp
+public sealed class WaterQualityParameters : ValueObject
+{
+    // Temperature parameters
+    public decimal? OptimalTemperature { get; }
+    public decimal? MinTemperature { get; }
+    public decimal? MaxTemperature { get; }
+    
+    // pH parameters
+    public decimal? OptimalPH { get; }
+    public decimal? MinPH { get; }
+    public decimal? MaxPH { get; }
+    
+    // Dissolved oxygen parameters
+    public decimal? OptimalOxygen { get; }
+    public decimal? MinOxygen { get; }
+    
+    // Salinity parameters
+    public decimal? OptimalSalinity { get; }
+    public decimal? MinSalinity { get; }
+    public decimal? MaxSalinity { get; }
+}
+```
+
+### Key Design Decisions
+
+**1. All Parameters are Optional (Nullable)**:
+- Allows flexibility in configuration
+- Not all tanks need all parameters
+- Can specify only relevant parameters for specific tank types
+
+**2. Optimal vs Min/Max Values**:
+- **Optimal**: Target value for best water quality
+- **Min/Max**: Acceptable range boundaries
+- Allows both target-based and range-based monitoring
+
+**3. Validation Methods**:
+- `IsTemperatureInRange()`: Checks if temperature is within acceptable range
+- `IsPHInRange()`: Checks if pH is within acceptable range
+- `IsOxygenSufficient()`: Checks if dissolved oxygen meets minimum requirement
+- `IsSalinityInRange()`: Checks if salinity is within acceptable range
+
+### Usage Examples
+
+**Creating Water Quality Parameters**:
+
+```csharp
+// Create with all parameters
+var parameters = WaterQualityParameters.Create(
+    optimalTemperature: 25.0m,
+    minTemperature: 20.0m,
+    maxTemperature: 30.0m,
+    optimalPH: 7.5m,
+    minPH: 7.0m,
+    maxPH: 8.0m,
+    optimalOxygen: 8.0m,
+    minOxygen: 6.0m,
+    optimalSalinity: 35.0m,
+    minSalinity: 30.0m,
+    maxSalinity: 40.0m
+);
+
+// Create with only temperature parameters
+var tempOnly = WaterQualityParameters.Create(
+    optimalTemperature: 25.0m,
+    minTemperature: 20.0m,
+    maxTemperature: 30.0m
+);
+
+// Create with minimal parameters
+var minimal = WaterQualityParameters.Create(
+    optimalTemperature: 25.0m
+);
+```
+
+**Validation Examples**:
+
+```csharp
+var parameters = WaterQualityParameters.Create(
+    minTemperature: 20.0m,
+    maxTemperature: 30.0m,
+    minPH: 7.0m,
+    maxPH: 8.0m,
+    minOxygen: 6.0m
+);
+
+// Check temperature
+bool tempOk = parameters.IsTemperatureInRange(25.0m);  // true
+bool tempLow = parameters.IsTemperatureInRange(15.0m); // false (below min)
+bool tempHigh = parameters.IsTemperatureInRange(35.0m); // false (above max)
+
+// Check pH
+bool phOk = parameters.IsPHInRange(7.5m);  // true
+bool phLow = parameters.IsPHInRange(6.5m); // false (below min)
+
+// Check oxygen
+bool oxygenOk = parameters.IsOxygenSufficient(8.0m);  // true (meets minimum)
+bool oxygenLow = parameters.IsOxygenSufficient(5.0m); // false (below minimum)
+```
+
+**Using in Tank Aggregate**:
+
+```csharp
+public sealed class Tank : AggregateRoot<TankId>
+{
+    public WaterQualityParameters? OptimalParameters { get; private set; }
+    
+    public void SetOptimalParameters(WaterQualityParameters parameters)
+    {
+        OptimalParameters = parameters;
+        Apply(new TankOptimalParametersSetEvent(Id, parameters));
+    }
+    
+    public bool IsWaterQualityAcceptable(
+        decimal temperature, 
+        decimal ph, 
+        decimal oxygen, 
+        decimal salinity)
+    {
+        if (OptimalParameters == null) return true; // No parameters set
+        
+        return OptimalParameters.IsTemperatureInRange(temperature) &&
+               OptimalParameters.IsPHInRange(ph) &&
+               OptimalParameters.IsOxygenSufficient(oxygen) &&
+               OptimalParameters.IsSalinityInRange(salinity);
+    }
+}
+```
+
+### Validation Rules
+
+**Range Validation**:
+- When both min and max are provided, min must be strictly less than max
+- Applies to: Temperature, pH, and Salinity
+- Oxygen only has minimum (no maximum typically needed)
+
+**Example Validation Errors**:
+
+```csharp
+// ❌ Invalid - min >= max
+WaterQualityParameters.Create(
+    minTemperature: 30.0m,
+    maxTemperature: 20.0m  // Error: Min must be less than max
+);
+
+// ❌ Invalid - min equals max
+WaterQualityParameters.Create(
+    minPH: 7.0m,
+    maxPH: 7.0m  // Error: Min must be less than max
+);
+
+// ✅ Valid - min < max
+WaterQualityParameters.Create(
+    minTemperature: 20.0m,
+    maxTemperature: 30.0m  // OK
+);
+```
+
+### Business Logic Methods
+
+**1. IsTemperatureInRange(decimal temperature)**:
+- Returns `true` if temperature is within min/max range (if specified)
+- Returns `true` if no range is specified
+- Used for temperature monitoring and alerts
+
+**2. IsPHInRange(decimal ph)**:
+- Returns `true` if pH is within min/max range (if specified)
+- Returns `true` if no range is specified
+- Used for pH monitoring and alerts
+
+**3. IsOxygenSufficient(decimal oxygen)**:
+- Returns `true` if oxygen meets or exceeds minimum (if specified)
+- Returns `true` if no minimum is specified
+- Used for dissolved oxygen monitoring and alerts
+
+**4. IsSalinityInRange(decimal salinity)**:
+- Returns `true` if salinity is within min/max range (if specified)
+- Returns `true` if no range is specified
+- Used for salinity monitoring and alerts
+
+### Real-World Use Cases
+
+**1. Tank Configuration**:
+```csharp
+// Set optimal parameters when creating a tank
+var parameters = WaterQualityParameters.Create(
+    optimalTemperature: 25.0m,
+    minTemperature: 20.0m,
+    maxTemperature: 30.0m,
+    optimalPH: 7.5m,
+    minPH: 7.0m,
+    maxPH: 8.0m
+);
+
+tank.SetOptimalParameters(parameters);
+```
+
+**2. Sensor Reading Validation**:
+```csharp
+// Check if sensor reading is acceptable
+var reading = sensor.GetLatestReading();
+bool isAcceptable = tank.OptimalParameters?.IsTemperatureInRange(reading.Temperature) ?? true;
+```
+
+**3. Alert Generation**:
+```csharp
+// Generate alert if parameters are out of range
+if (!parameters.IsTemperatureInRange(currentTemperature))
+{
+    alertService.SendAlert("Temperature out of acceptable range");
+}
+```
+
+### Benefits
+
+**1. Encapsulation**:
+- All water quality parameters in one place
+- Related values grouped together
+- Easy to pass around and store
+
+**2. Validation**:
+- Range validation at creation
+- Invalid ranges cannot be created
+- Business rules enforced
+
+**3. Reusability**:
+- Can be used in multiple tanks
+- Can be used in monitoring services
+- Can be used in reporting
+
+**4. Type Safety**:
+- Compiler prevents mixing with other types
+- Clear domain concept
+- Self-documenting code
+
+**5. Immutability**:
+- Once created, cannot be changed
+- Thread-safe
+- Predictable behavior
+
+### Common Patterns
+
+**Pattern 1: Optional Parameters**:
+```csharp
+// Only specify what you need
+var params = WaterQualityParameters.Create(
+    optimalTemperature: 25.0m,
+    minTemperature: 20.0m,
+    maxTemperature: 30.0m
+    // Other parameters are null/optional
+);
+```
+
+**Pattern 2: Validation Before Use**:
+```csharp
+if (parameters != null && !parameters.IsTemperatureInRange(temperature))
+{
+    // Handle out of range
+}
+```
+
+**Pattern 3: Default Behavior**:
+```csharp
+// If no parameters set, assume all readings are acceptable
+bool isOk = parameters?.IsTemperatureInRange(temperature) ?? true;
+```
+
+### Integration with Domain Events
+
+WaterQualityParameters is used in domain events:
+
+```csharp
+public sealed record TankOptimalParametersSetEvent(
+    TankId TankId,
+    WaterQualityParameters Parameters
+) : DomainEvent;
+```
+
+This event is raised when optimal parameters are configured for a tank, enabling:
+- Alert threshold configuration
+- Monitoring system setup
+- Compliance tracking
+- Historical parameter tracking
+
+---
 
 This completes the comprehensive guide to Value Objects in Domain-Driven Design! 🎯
 
