@@ -920,3 +920,349 @@ public class Tank : AggregateRoot<Guid>  // ❌ No type safety
 3. Use strongly-typed IDs for type safety and clarity
 4. This ensures business rules are enforced and consistency is maintained
 
+---
+
+## 20. Child Entities in Aggregates (Sensor Example)
+
+### What are Child Entities?
+
+**Child Entities** are entities that belong to an aggregate and are managed through the aggregate root. They have their own identity but cannot exist independently of the aggregate.
+
+**Key Characteristics**:
+- **Own Identity**: Each child entity has a unique ID
+- **Belongs to Aggregate**: Cannot exist without the aggregate root
+- **Managed Through Root**: All operations go through aggregate root
+- **Part of Consistency Boundary**: Must remain consistent with aggregate
+
+### Sensor as a Child Entity
+
+**In the Tank Aggregate**:
+- `Sensor` is a child entity of `Tank`
+- Sensors belong to a tank
+- Sensors are managed through `Tank` methods
+- Sensors cannot exist without a tank
+
+**Structure**:
+```
+Tank (Aggregate Root)
+└── Sensors (Child Entities)
+    ├── Sensor 1 (SensorId: id1)
+    ├── Sensor 2 (SensorId: id2)
+    └── Sensor 3 (SensorId: id3)
+```
+
+### Entity vs Aggregate Root for Child Entities
+
+**Sensor inherits from Entity, not AggregateRoot**:
+```csharp
+public sealed class Sensor : Entity<SensorId>  // ✅ Child entity
+{
+    // Sensor properties and methods
+}
+```
+
+**Why Entity, not AggregateRoot?**:
+- Sensors don't need version tracking
+- Sensors don't need audit fields (CreatedAt, UpdatedAt)
+- Sensors don't control other entities
+- Sensors are managed by Tank aggregate root
+
+**Tank inherits from AggregateRoot**:
+```csharp
+public sealed class Tank : AggregateRoot<TankId>  // ✅ Aggregate root
+{
+    private readonly List<Sensor> _sensors = new();
+    // Tank manages sensors
+}
+```
+
+### Access Control Pattern
+
+**✅ Correct - Through Aggregate Root**:
+```csharp
+// Add sensor through tank
+tank.AddSensor(sensor);
+
+// Sensor operations through tank
+tank.RemoveSensor(sensorId);
+
+// Query sensors through tank
+var activeSensors = tank.GetActiveSensors();
+```
+
+**❌ Wrong - Direct Access**:
+```csharp
+// ❌ Don't modify sensor directly
+sensor.Activate();  // Should go through tank
+
+// ❌ Don't create sensor independently
+var sensor = Sensor.Create(...);  // Must be added to tank
+```
+
+### Child Entity Lifecycle
+
+**1. Creation**:
+```csharp
+// Create sensor
+var sensor = Sensor.Create(sensorType, model, manufacturer, serialNumber, accuracy);
+
+// Add to tank (through aggregate root)
+tank.AddSensor(sensor);
+```
+
+**2. Modification**:
+```csharp
+// Sensors can modify themselves (internal operations)
+sensor.Calibrate(calibrationDate, newAccuracy);
+sensor.SetRange(minValue, maxValue);
+sensor.Activate();
+sensor.Deactivate(reason);
+```
+
+**3. Removal**:
+```csharp
+// Remove through aggregate root
+tank.RemoveSensor(sensorId);
+```
+
+### Child Entity Responsibilities
+
+**1. Own State Management**:
+- Sensors manage their own properties
+- Sensors validate their own state
+- Sensors raise their own domain events
+
+**2. Business Logic**:
+- Sensors have calibration logic
+- Sensors have range validation
+- Sensors track their own status
+
+**3. Domain Events**:
+- Sensors raise events for their changes
+- Events are collected by aggregate root
+- Events published after aggregate persistence
+
+### Sensor Domain Events
+
+**Events Raised by Sensor**:
+```csharp
+// Calibration event
+AddDomainEvent(new SensorCalibratedEvent(Id, calibrationDate, newAccuracy, notes));
+
+// Range update event
+AddDomainEvent(new SensorRangeUpdatedEvent(Id, minValue, maxValue));
+
+// Activation event
+AddDomainEvent(new SensorActivatedEvent(Id));
+
+// Status change event
+AddDomainEvent(new SensorStatusChangedEvent(Id, oldStatus, newStatus));
+```
+
+**Event Collection**:
+- Events are added to sensor's DomainEvents collection
+- Tank aggregate collects all sensor events
+- Events published after tank is saved
+
+### Sensor Factory Method
+
+**Pattern**:
+```csharp
+public static Sensor Create(SensorType sensorType, string model, 
+    string manufacturer, string serialNumber, decimal accuracy)
+{
+    // Validation
+    if (string.IsNullOrWhiteSpace(model))
+        throw new ArgumentException("Model cannot be empty", nameof(model));
+    
+    // Create ID
+    var sensorId = SensorId.Create();
+    
+    // Create instance
+    return new Sensor(sensorId, sensorType, model, manufacturer, serialNumber, accuracy);
+}
+```
+
+**Benefits**:
+- Validates input before creation
+- Generates ID automatically
+- Sets default ranges based on sensor type
+- Initializes state (IsActive = true, Status = Online)
+
+### Sensor Business Logic
+
+**1. Calibration Logic**:
+```csharp
+public void Calibrate(DateTime calibrationDate, decimal newAccuracy, string? notes = null)
+{
+    // Validation
+    if (calibrationDate > DateTime.UtcNow)
+        throw new ArgumentException("Calibration date cannot be in the future");
+    
+    // Update state
+    CalibrationDate = calibrationDate;
+    Accuracy = newAccuracy;
+    
+    // Calculate next calibration (based on sensor type)
+    NextCalibrationDate = calibrationDate.AddMonths(GetCalibrationIntervalMonths());
+    
+    // Raise event
+    AddDomainEvent(new SensorCalibratedEvent(...));
+}
+```
+
+**2. Range Validation**:
+```csharp
+public bool IsValueInRange(decimal value)
+{
+    if (!MinValue.HasValue || !MaxValue.HasValue) return true;
+    return value >= MinValue.Value && value <= MaxValue.Value;
+}
+```
+
+**3. Default Ranges**:
+```csharp
+private void SetDefaultRanges()
+{
+    (MinValue, MaxValue) = SensorType switch
+    {
+        SensorType.Temperature => (-10m, 50m),
+        SensorType.pH => (0m, 14m),
+        // ... other sensor types
+    };
+}
+```
+
+### Query Methods in Child Entities
+
+**Read-Only Queries**:
+```csharp
+public bool IsCalibrationDue()
+{
+    return NextCalibrationDate.HasValue && 
+           NextCalibrationDate.Value <= DateTime.UtcNow;
+}
+
+public bool IsValueInRange(decimal value)
+{
+    // Check if value is within valid range
+}
+```
+
+**Characteristics**:
+- No side effects
+- Don't modify state
+- Return information only
+- Can be called from aggregate root
+
+### Benefits of Child Entities
+
+**1. Encapsulation**:
+- Sensor logic encapsulated in Sensor class
+- Tank doesn't need to know sensor internals
+- Clear separation of concerns
+
+**2. Reusability**:
+- Sensor logic can be reused
+- Same sensor class for different tanks
+- Consistent behavior
+
+**3. Testability**:
+- Test sensor independently
+- Mock sensors in tank tests
+- Isolated unit tests
+
+**4. Maintainability**:
+- Sensor changes don't affect tank
+- Clear responsibility boundaries
+- Easy to understand
+
+### Common Patterns
+
+**Pattern 1: Factory Method**:
+```csharp
+public static Sensor Create(...)  // Static factory
+{
+    // Validation + creation
+}
+```
+
+**Pattern 2: Command Methods**:
+```csharp
+public void Calibrate(...)  // Modifies state + raises event
+{
+    // Validation
+    // State change
+    // Event
+}
+```
+
+**Pattern 3: Query Methods**:
+```csharp
+public bool IsCalibrationDue()  // Read-only query
+{
+    // Return information
+}
+```
+
+**Pattern 4: Private Helpers**:
+```csharp
+private void SetDefaultRanges()  // Internal logic
+{
+    // Set defaults based on type
+}
+```
+
+### Real-World Analogy
+
+Think of **Child Entities** like **employees in a company**:
+
+- **Aggregate Root (Tank)**: Like the company/department
+- **Child Entities (Sensors)**: Like employees
+- **Management**: Employees managed through company structure
+- **Independence**: Employees have their own identity and skills
+- **Belonging**: Employees belong to the company
+- **Operations**: Employee operations go through company processes
+
+**The Sensor Entity**:
+- **Identity**: Each sensor has unique ID
+- **Belongs to**: Sensor belongs to Tank
+- **Managed by**: Tank manages sensor lifecycle
+- **Own Logic**: Sensor has calibration, range validation logic
+- **Events**: Sensor raises its own events
+
+---
+
+## Summary (Final Update)
+
+**Aggregates** in Domain-Driven Design provide:
+
+1. **Consistency Boundaries**: Related objects stay consistent
+2. **Transaction Boundaries**: Changes happen atomically
+3. **Encapsulation**: Access through aggregate root only
+4. **Business Rules**: Enforced at aggregate level
+5. **Clear Structure**: Easy to understand and maintain
+6. **Type Safety**: Strongly-typed IDs prevent mistakes
+7. **Child Entity Management**: Proper lifecycle and access control
+
+**The Tank Aggregate** demonstrates:
+- ✅ Proper aggregate root design
+- ✅ Child entity management (Sensor)
+- ✅ Business rule enforcement
+- ✅ Domain event application
+- ✅ Value object usage
+- ✅ Encapsulation and access control
+- ✅ Strongly-typed ID (TankId, SensorId)
+- ✅ Child entity factory methods
+- ✅ Child entity business logic
+
+**In Simple Terms**: An aggregate is like a "family" where the aggregate root is the "head of household" who controls access and ensures everyone follows the rules. The Tank aggregate manages tank properties, sensors (child entities), and maintenance, ensuring all business rules are followed and consistency is maintained. Strongly-typed IDs like TankId and SensorId provide type safety, and child entities like Sensor encapsulate their own business logic while being managed through the aggregate root.
+
+**Key Takeaways**:
+1. Always access and modify aggregates through the aggregate root
+2. Never directly modify child entities from outside the aggregate
+3. Use strongly-typed IDs for type safety and clarity
+4. Child entities can manage their own state and raise events
+5. Child entities are part of the aggregate's consistency boundary
+6. This ensures business rules are enforced and consistency is maintained
+
