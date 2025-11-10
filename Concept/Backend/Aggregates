@@ -1,0 +1,922 @@
+# Theoretical Concepts: Aggregates in Domain-Driven Design (DDD)
+
+## 1. What is an Aggregate?
+
+An **Aggregate** is a cluster of related objects (entities and value objects) that are treated as a single unit for data changes.
+
+**Key Characteristics**:
+- **Aggregate Root**: One entity acts as the entry point (the root)
+- **Consistency Boundary**: All objects within the aggregate must remain consistent
+- **Transaction Boundary**: Changes to the aggregate happen atomically
+- **Encapsulation**: External code can only access the aggregate through the root
+
+**Key Principle**: External code can only modify the aggregate through the aggregate root. You never directly modify child entities - you go through the root.
+
+### Example in AquaCulture Platform:
+- `Tank` is an aggregate root containing `Sensor` entities
+- To add a sensor: `tank.AddSensor(sensor)` ✅ (through root)
+- To directly modify sensor: `sensor.UpdateStatus(...)` ❌ (bypasses root - not allowed)
+- The `Tank` aggregate root ensures all sensors belong to it and maintains consistency
+
+---
+
+## 2. Aggregate Root vs Entity
+
+### Relationship
+
+```
+AggregateRoot<TId> : Entity<TId>
+```
+
+**AggregateRoot inherits from Entity**, meaning:
+- An aggregate root IS an entity (has identity, equality, events)
+- An aggregate root HAS ADDITIONAL capabilities (version, audit fields, event application)
+- An aggregate root CONTROLS access to child entities
+
+### When to Use Each
+
+**Use `Entity<TId>` for**:
+- Child entities within an aggregate (like `Sensor` inside `Tank`)
+- Entities that don't need version tracking
+- Simple entities without complex lifecycle management
+
+**Use `AggregateRoot<TId>` for**:
+- Main entities that control aggregates (like `Tank`)
+- Entities that need optimistic concurrency control
+- Entities that participate in event sourcing
+- Entities that need audit trail (CreatedAt, UpdatedAt)
+
+---
+
+## 3. The Tank Aggregate Example
+
+### Structure
+
+```
+Tank (Aggregate Root)
+├── Properties (Value Objects)
+│   ├── Name (string)
+│   ├── Capacity (TankCapacity - Value Object)
+│   ├── Location (Location - Value Object)
+│   ├── TankType (enum)
+│   ├── Status (enum)
+│   └── OptimalParameters (WaterQualityParameters - Value Object)
+├── Child Entities
+│   └── Sensors (List<Sensor>)
+└── Maintenance Tracking
+    ├── LastMaintenanceDate
+    └── NextMaintenanceDate
+```
+
+### Key Design Decisions
+
+**1. Tank is the Aggregate Root**:
+- All access to tank data goes through `Tank` class
+- Sensors cannot be modified directly
+- Business rules enforced at aggregate level
+
+**2. Sensors are Child Entities**:
+- Sensors belong to a tank
+- Cannot exist without a tank
+- Managed through tank methods
+
+**3. Value Objects for Descriptions**:
+- `TankCapacity`, `Location`, `WaterQualityParameters` are value objects
+- Immutable, compared by value
+- Encapsulate validation
+
+---
+
+## 4. Aggregate Boundaries
+
+### What Goes Inside an Aggregate?
+
+**✅ Include in Aggregate**:
+- Objects that must remain consistent together
+- Objects that are always accessed together
+- Objects that share the same lifecycle
+- Objects that enforce business rules together
+
+**Example**: Tank and its Sensors
+- Sensors must belong to a tank
+- Tank rules depend on sensor state
+- Sensors are accessed through tank
+- All must be consistent
+
+### What Stays Outside?
+
+**❌ Don't Include**:
+- Objects with independent lifecycles
+- Objects accessed independently
+- Objects that don't need consistency with the aggregate
+- Reference data
+
+**Example**: User, TankType enum
+- User has independent lifecycle
+- TankType is reference data
+- Don't need to be consistent with tank state
+
+---
+
+## 5. Business Rules in Aggregates
+
+### How Business Rules are Enforced
+
+**In the Tank Aggregate**:
+
+1. **Activation Rule**:
+```csharp
+public void Activate()
+{
+    // Business rule: Tank must have at least one active sensor
+    if (!_sensors.Any(s => s.IsActive))
+        throw new InvalidOperationException("Tank must have at least one active sensor");
+    
+    Status = TankStatus.Active;
+    Apply(new TankActivatedEvent(Id));
+}
+```
+
+2. **Sensor Limit Rule**:
+```csharp
+public void AddSensor(Sensor sensor)
+{
+    // Business rule: Maximum 10 sensors per tank
+    if (_sensors.Count >= 10)
+        throw new InvalidOperationException("Tank cannot have more than 10 sensors");
+    
+    _sensors.Add(sensor);
+    Apply(new SensorAddedToTankEvent(...));
+}
+```
+
+3. **Sensor Removal Rule**:
+```csharp
+public void RemoveSensor(SensorId sensorId)
+{
+    // Business rule: Cannot remove last active sensor from active tank
+    if (Status == TankStatus.Active && 
+        _sensors.Count(s => s.IsActive) == 1 && 
+        sensor.IsActive)
+        throw new InvalidOperationException("Cannot remove the last active sensor");
+    
+    _sensors.Remove(sensor);
+    Apply(new SensorRemovedFromTankEvent(...));
+}
+```
+
+### Why Rules are in the Aggregate
+
+**Encapsulation**: Business rules are where the data lives
+**Consistency**: Rules enforced every time aggregate is modified
+**Single Source of Truth**: Rules defined once, in one place
+**Domain Language**: Rules expressed in domain terms
+
+---
+
+## 6. Aggregate Root Responsibilities
+
+### 1. Control Access
+
+**Only through Root**:
+```csharp
+// ✅ Correct - through root
+tank.AddSensor(sensor);
+tank.Activate();
+tank.UpdateCapacity(newCapacity);
+
+// ❌ Wrong - direct access
+sensor.UpdateStatus(...);  // Should go through tank
+```
+
+### 2. Maintain Consistency
+
+**Invariants**:
+- Tank must have at least one active sensor to be active
+- Tank cannot have more than 10 sensors
+- Last active sensor cannot be removed from active tank
+
+**Enforcement**: Aggregate root ensures invariants are never violated
+
+### 3. Manage Child Entities
+
+**Lifecycle**:
+- Create child entities
+- Modify child entities
+- Remove child entities
+- Query child entities
+
+**All through aggregate root methods**
+
+### 4. Raise Domain Events
+
+**Event Application**:
+```csharp
+Apply(new TankActivatedEvent(Id));
+Apply(new SensorAddedToTankEvent(Id, sensor.Id, sensor.SensorType));
+```
+
+**Benefits**:
+- Version tracking
+- Audit trail
+- Event sourcing support
+
+---
+
+## 7. Factory Methods Pattern
+
+### Why Factory Methods?
+
+**Encapsulation**: Creation logic in one place
+**Validation**: Ensure valid aggregate creation
+**Consistency**: All aggregates created the same way
+**Domain Language**: Expressive method names
+
+### Tank.Create() Example
+
+```csharp
+public static Tank Create(string name, TankCapacity capacity, Location location, TankType tankType)
+{
+    // Validation
+    if (string.IsNullOrWhiteSpace(name))
+        throw new ArgumentException("Tank name cannot be empty", nameof(name));
+    
+    // Create ID
+    var tankId = TankId.Create();
+    
+    // Create aggregate
+    return new Tank(tankId, name, capacity, location, tankType);
+}
+```
+
+**Benefits**:
+- Validates input before creation
+- Generates ID automatically
+- Applies initial domain event
+- Sets initial state (Status = Inactive)
+
+---
+
+## 8. Encapsulation and Private Setters
+
+### Why Private Setters?
+
+**Prevents External Modification**:
+```csharp
+public string Name { get; private set; }  // ✅ Can only be set within class
+public TankCapacity Capacity { get; private set; }  // ✅ Protected from external changes
+```
+
+**Benefits**:
+- Forces use of domain methods
+- Ensures business rules are applied
+- Prevents invalid state changes
+- Maintains aggregate integrity
+
+### Internal Collections
+
+**Private Collection**:
+```csharp
+private readonly List<Sensor> _sensors = new();  // ✅ Private collection
+```
+
+**Public Read-Only Access**:
+```csharp
+public IReadOnlyList<Sensor> Sensors => _sensors.AsReadOnly();  // ✅ Read-only exposure
+```
+
+**Why?**:
+- External code can read sensors
+- External code cannot modify sensors directly
+- Must use `AddSensor()` or `RemoveSensor()` methods
+- Business rules always enforced
+
+---
+
+## 9. Domain Events in Aggregates
+
+### Event-Driven State Changes
+
+**Every State Change Raises Event**:
+```csharp
+public void UpdateName(string newName)
+{
+    // ... validation ...
+    Name = newName;
+    Apply(new TankNameChangedEvent(Id, oldName, newName));  // ✅ Event raised
+}
+```
+
+**Benefits**:
+- Complete audit trail
+- Event sourcing support
+- Decoupled event handlers
+- Version tracking
+
+### Event Application Pattern
+
+**Use Apply() Method**:
+```csharp
+Apply(new TankActivatedEvent(Id));  // ✅ Correct
+```
+
+**Not AddDomainEvent()**:
+```csharp
+AddDomainEvent(new TankActivatedEvent(Id));  // ❌ Wrong - doesn't increment version
+```
+
+**Why Apply()?**:
+- Automatically increments version
+- Updates UpdatedAt timestamp
+- Ensures consistency
+
+---
+
+## 10. Query Methods
+
+### Read-Only Queries
+
+**Purpose**: Provide information without modifying state
+
+**Examples**:
+```csharp
+public bool IsMaintenanceDue()
+{
+    return NextMaintenanceDate.HasValue && 
+           NextMaintenanceDate.Value <= DateTime.UtcNow;
+}
+
+public bool HasSensorOfType(SensorType sensorType)
+{
+    return _sensors.Any(s => s.SensorType == sensorType && s.IsActive);
+}
+
+public IEnumerable<Sensor> GetActiveSensors()
+{
+    return _sensors.Where(s => s.IsActive);
+}
+```
+
+**Characteristics**:
+- No side effects
+- Don't modify aggregate state
+- Don't raise events
+- Return information only
+
+---
+
+## 11. Aggregate Size Guidelines
+
+### Keep Aggregates Small
+
+**Why?**:
+- Easier to maintain
+- Better performance
+- Clearer boundaries
+- Less contention
+
+### How Small?
+
+**Rule of Thumb**:
+- Most aggregates: 1-5 entities
+- Complex aggregates: 5-10 entities
+- Avoid: More than 10 entities
+
+**Tank Aggregate**:
+- 1 root entity (Tank)
+- Multiple child entities (Sensors)
+- Multiple value objects (Capacity, Location, etc.)
+- ✅ Good size - manageable
+
+---
+
+## 12. Aggregate Persistence
+
+### Unit of Work Pattern
+
+**Load Entire Aggregate**:
+```csharp
+var tank = repository.GetById(tankId);  // Loads tank + all sensors
+```
+
+**Save Entire Aggregate**:
+```csharp
+repository.Save(tank);  // Saves tank + all changes to sensors
+```
+
+**Transaction Boundary**:
+- All changes saved together
+- All or nothing
+- Maintains consistency
+
+### Entity Framework Core
+
+**Configuration**:
+```csharp
+// Tank owns Sensors
+modelBuilder.Entity<Tank>()
+    .HasMany(t => t.Sensors)
+    .WithOne()
+    .OnDelete(DeleteBehavior.Cascade);
+```
+
+**Loading**:
+```csharp
+var tank = context.Tanks
+    .Include(t => t.Sensors)  // Eager load sensors
+    .FirstOrDefault(t => t.Id == tankId);
+```
+
+---
+
+## 13. Common Patterns
+
+### Pattern 1: Factory Method
+```csharp
+public static Tank Create(...)  // Static factory
+{
+    // Validation + creation
+}
+```
+
+### Pattern 2: Command Methods
+```csharp
+public void Activate()  // Modifies state + raises event
+{
+    // Business rule check
+    // State change
+    // Event application
+}
+```
+
+### Pattern 3: Query Methods
+```csharp
+public bool IsMaintenanceDue()  // Read-only query
+{
+    // Return information
+}
+```
+
+### Pattern 4: Child Entity Management
+```csharp
+public void AddSensor(Sensor sensor)  // Manages child entities
+{
+    // Validation
+    // Add to collection
+    // Raise event
+}
+```
+
+---
+
+## 14. Real-World Analogy
+
+Think of an **Aggregate** like a **household**:
+
+- **Aggregate Root**: The head of household (controls access)
+- **Child Entities**: Family members (managed by head)
+- **Value Objects**: Address, phone number (descriptive)
+- **Business Rules**: "No guests after 10 PM" (enforced by head)
+- **Consistency**: All family members must follow rules
+- **Access**: Visitors interact with head, not directly with family
+
+**The Tank Aggregate**:
+- **Tank** = Head of household
+- **Sensors** = Family members
+- **Capacity, Location** = Address (descriptive)
+- **Business Rules** = "Must have active sensor to activate"
+- **Consistency** = All sensors belong to tank
+- **Access** = All operations through Tank methods
+
+---
+
+## 15. Benefits of Aggregates
+
+### 1. Consistency
+- All related objects stay consistent
+- Business rules enforced
+- Invariants never violated
+
+### 2. Encapsulation
+- Internal structure hidden
+- Access through root only
+- Implementation can change
+
+### 3. Transaction Boundaries
+- Clear what changes together
+- Atomic operations
+- Easier to reason about
+
+### 4. Performance
+- Load only what's needed
+- Clear boundaries
+- Optimized queries
+
+### 5. Maintainability
+- Clear structure
+- Single responsibility
+- Easy to understand
+
+---
+
+## 16. Common Mistakes to Avoid
+
+### ❌ Don't: Allow Direct Child Entity Access
+
+```csharp
+// ❌ Bad - direct access
+public List<Sensor> Sensors { get; set; }  // Mutable collection
+tank.Sensors.Add(sensor);  // Bypasses business rules
+```
+
+### ✅ Do: Control Access Through Root
+
+```csharp
+// ✅ Good - controlled access
+private readonly List<Sensor> _sensors = new();
+public IReadOnlyList<Sensor> Sensors => _sensors.AsReadOnly();
+tank.AddSensor(sensor);  // Enforces business rules
+```
+
+### ❌ Don't: Make Aggregates Too Large
+
+```csharp
+// ❌ Bad - too many responsibilities
+public class Tank : AggregateRoot
+{
+    // Tank properties
+    // Sensor management
+    // User management  // ❌ Should be separate aggregate
+    // Order management  // ❌ Should be separate aggregate
+}
+```
+
+### ✅ Do: Keep Aggregates Focused
+
+```csharp
+// ✅ Good - focused responsibility
+public class Tank : AggregateRoot
+{
+    // Tank properties
+    // Sensor management
+    // Maintenance tracking
+}
+```
+
+### ❌ Don't: Share Entities Between Aggregates
+
+```csharp
+// ❌ Bad - shared entity
+public class Sensor : Entity
+{
+    public TankId? TankId { get; set; }  // Belongs to tank
+    public UserId? UserId { get; set; }  // ❌ Also belongs to user - wrong!
+}
+```
+
+### ✅ Do: One Aggregate Per Entity
+
+```csharp
+// ✅ Good - clear ownership
+public class Sensor : Entity
+{
+    public TankId TankId { get; }  // Only belongs to tank
+}
+```
+
+---
+
+## 17. Design Patterns Used
+
+### 1. Aggregate Pattern (DDD)
+- Cluster of related objects
+- Single entry point (root)
+- Consistency boundary
+
+### 2. Factory Pattern
+- Static factory methods
+- Encapsulated creation
+- Validation at creation
+
+### 3. Repository Pattern
+- Load/save aggregates
+- Abstraction over persistence
+- Unit of work
+
+### 4. Domain Events Pattern
+- State changes as events
+- Event sourcing support
+- Decoupled handlers
+
+---
+
+## Summary
+
+**Aggregates** in Domain-Driven Design provide:
+
+1. **Consistency Boundaries**: Related objects stay consistent
+2. **Transaction Boundaries**: Changes happen atomically
+3. **Encapsulation**: Access through aggregate root only
+4. **Business Rules**: Enforced at aggregate level
+5. **Clear Structure**: Easy to understand and maintain
+
+**The Tank Aggregate** demonstrates:
+- ✅ Proper aggregate root design
+- ✅ Child entity management
+- ✅ Business rule enforcement
+- ✅ Domain event application
+- ✅ Value object usage
+- ✅ Encapsulation and access control
+
+**In Simple Terms**: An aggregate is like a "family" where the aggregate root is the "head of household" who controls access and ensures everyone follows the rules. The Tank aggregate manages tank properties, sensors, and maintenance, ensuring all business rules are followed and consistency is maintained.
+
+**Key Takeaway**: Always access and modify aggregates through the aggregate root. Never directly modify child entities. This ensures business rules are enforced and consistency is maintained.
+
+---
+
+## 18. Strongly-Typed IDs (TankId Example)
+
+### What are Strongly-Typed IDs?
+
+**Strongly-typed IDs** are value objects that wrap primitive ID types (like `Guid`, `int`, `string`) to provide type safety and prevent ID misuse.
+
+**Instead of**:
+```csharp
+public class Tank : AggregateRoot<Guid>  // ❌ Generic Guid - no type safety
+{
+    public Guid Id { get; }
+}
+```
+
+**Use**:
+```csharp
+public class Tank : AggregateRoot<TankId>  // ✅ Strongly-typed - type safe
+{
+    public TankId Id { get; }
+}
+```
+
+### Why Use Strongly-Typed IDs?
+
+**1. Type Safety**:
+```csharp
+// ❌ Without strongly-typed IDs - compiler allows mistakes
+void ProcessTank(Guid tankId) { }
+void ProcessSensor(Guid sensorId) { }
+
+ProcessTank(sensorId);  // ❌ Compiler error? No! Both are Guid
+ProcessSensor(tankId);  // ❌ Wrong ID passed, but compiler doesn't catch it
+
+// ✅ With strongly-typed IDs - compiler prevents mistakes
+void ProcessTank(TankId tankId) { }
+void ProcessSensor(SensorId sensorId) { }
+
+ProcessTank(sensorId);  // ✅ Compiler error! Type mismatch
+ProcessSensor(tankId);  // ✅ Compiler error! Type mismatch
+```
+
+**2. Self-Documenting Code**:
+```csharp
+// ❌ Unclear what type of ID
+void UpdateEntity(Guid id) { }  // What entity? Tank? Sensor? User?
+
+// ✅ Clear what type of ID
+void UpdateTank(TankId id) { }  // Obviously a Tank ID
+```
+
+**3. Refactoring Safety**:
+- Renaming TankId to AquariumId is easy
+- Find all usages is straightforward
+- Compiler catches all places that need updating
+
+**4. Domain Language**:
+- `TankId` is more expressive than `Guid`
+- Matches domain terminology
+- Clearer intent
+
+### TankId Implementation
+
+```csharp
+public sealed class TankId : ValueObject
+{
+    public Guid Value { get; }
+    
+    private TankId(Guid value)
+    {
+        Value = value;
+    }
+    
+    public static TankId Create() => new(Guid.NewGuid());
+    public static TankId Create(Guid value) => new(value);
+    
+    // Implicit conversion operators for convenience
+    public static implicit operator Guid(TankId tankId) => tankId.Value;
+    public static implicit operator TankId(Guid value) => new(value);
+    
+    protected override IEnumerable<object> GetEqualityComponents()
+    {
+        yield return Value;
+    }
+}
+```
+
+### Key Design Decisions
+
+**1. Value Object Base Class**:
+- Inherits from `ValueObject` for value-based equality
+- Two TankIds with same GUID are equal
+- Immutable by design
+
+**2. Private Constructor**:
+- Forces use of factory methods
+- Ensures controlled creation
+- Prevents invalid instances
+
+**3. Factory Methods**:
+- `Create()` - Generates new GUID
+- `Create(Guid)` - Uses existing GUID
+- Clear intent for each use case
+
+**4. Implicit Conversion Operators**:
+- `TankId` → `Guid`: For EF Core, serialization
+- `Guid` → `TankId`: For convenience, backward compatibility
+- Seamless integration with existing code
+
+### Usage Examples
+
+**Creating a New Tank**:
+```csharp
+var tankId = TankId.Create();  // ✅ Generates new GUID
+var tank = Tank.Create("Tank A", capacity, location, tankType);
+```
+
+**Loading from Database**:
+```csharp
+var guidFromDb = Guid.Parse("...");
+var tankId = TankId.Create(guidFromDb);  // ✅ Reconstruct from stored GUID
+var tank = repository.GetById(tankId);
+```
+
+**Using with Entity Framework Core**:
+```csharp
+// EF Core automatically converts TankId to Guid
+var tank = context.Tanks.FirstOrDefault(t => t.Id == tankId);
+
+// Or use Guid directly (implicit conversion)
+Guid guidId = tankId;  // ✅ Automatic conversion
+TankId id = guidId;    // ✅ Automatic conversion
+```
+
+**Method Signatures**:
+```csharp
+// ✅ Type-safe - compiler prevents mistakes
+public Tank GetTank(TankId tankId) { }
+public Sensor GetSensor(SensorId sensorId) { }
+
+// ❌ Not type-safe - easy to mix up
+public Tank GetTank(Guid id) { }
+public Sensor GetSensor(Guid id) { }
+```
+
+### Benefits Summary
+
+**1. Compile-Time Safety**:
+- Compiler catches ID type mismatches
+- Prevents runtime errors
+- Catches bugs early
+
+**2. Better IntelliSense**:
+- IDE shows correct type
+- Autocomplete works better
+- Clearer method signatures
+
+**3. Refactoring Support**:
+- Easy to rename
+- Find all references works perfectly
+- Safe refactoring
+
+**4. Domain Clarity**:
+- `TankId` is clearer than `Guid`
+- Matches domain language
+- Self-documenting
+
+**5. Framework Integration**:
+- Works with EF Core (implicit conversion)
+- Works with serialization
+- Works with APIs
+
+### Common Patterns
+
+**Pattern 1: One ID Type Per Aggregate**:
+```csharp
+TankId      // For Tank aggregate
+SensorId    // For Sensor entity
+UserId      // For User aggregate
+```
+
+**Pattern 2: Factory Methods**:
+```csharp
+TankId.Create()           // New ID
+TankId.Create(guid)        // From existing GUID
+```
+
+**Pattern 3: Implicit Conversion**:
+```csharp
+Guid guid = tankId;        // Automatic
+TankId id = guid;          // Automatic
+```
+
+### Real-World Analogy
+
+Think of **Strongly-Typed IDs** like **specialized keys**:
+
+- **Generic Key (Guid)**: Like a master key - fits many locks, but you might use the wrong one
+- **Strongly-Typed ID (TankId)**: Like a car key - only fits your car, can't accidentally use it on a house
+
+**Benefits**:
+- Can't accidentally use TankId where SensorId is needed
+- Clear what type of entity the ID represents
+- Compiler prevents mistakes
+
+---
+
+## 19. Aggregate ID Design
+
+### Best Practices
+
+**✅ Do: Use Strongly-Typed IDs**:
+```csharp
+public class Tank : AggregateRoot<TankId>  // ✅ Type-safe
+{
+    public TankId Id { get; }
+}
+```
+
+**❌ Don't: Use Primitive Types**:
+```csharp
+public class Tank : AggregateRoot<Guid>  // ❌ No type safety
+{
+    public Guid Id { get; }
+}
+```
+
+### ID Type Selection
+
+**Guid (Recommended)**:
+- Globally unique
+- No database sequence needed
+- Works in distributed systems
+- Example: `TankId : ValueObject { Guid Value }`
+
+**Int/Long**:
+- Sequential
+- Smaller storage
+- Requires database sequence
+- Example: `OrderId : ValueObject { long Value }`
+
+**String**:
+- Human-readable
+- Can encode meaning
+- Slower lookups
+- Example: `ProductCode : ValueObject { string Value }`
+
+### Implementation Checklist
+
+- ✅ Inherit from `ValueObject`
+- ✅ Private constructor
+- ✅ Factory methods (`Create()`)
+- ✅ Implicit conversion operators
+- ✅ Override `GetEqualityComponents()`
+- ✅ Immutable properties
+- ✅ Override `ToString()`
+
+---
+
+## Summary (Updated)
+
+**Aggregates** in Domain-Driven Design provide:
+
+1. **Consistency Boundaries**: Related objects stay consistent
+2. **Transaction Boundaries**: Changes happen atomically
+3. **Encapsulation**: Access through aggregate root only
+4. **Business Rules**: Enforced at aggregate level
+5. **Clear Structure**: Easy to understand and maintain
+6. **Type Safety**: Strongly-typed IDs prevent mistakes
+
+**The Tank Aggregate** demonstrates:
+- ✅ Proper aggregate root design
+- ✅ Child entity management
+- ✅ Business rule enforcement
+- ✅ Domain event application
+- ✅ Value object usage
+- ✅ Encapsulation and access control
+- ✅ Strongly-typed ID (TankId)
+
+**In Simple Terms**: An aggregate is like a "family" where the aggregate root is the "head of household" who controls access and ensures everyone follows the rules. The Tank aggregate manages tank properties, sensors, and maintenance, ensuring all business rules are followed and consistency is maintained. Strongly-typed IDs like TankId provide an extra layer of safety, preventing you from accidentally using the wrong type of ID.
+
+**Key Takeaways**:
+1. Always access and modify aggregates through the aggregate root
+2. Never directly modify child entities
+3. Use strongly-typed IDs for type safety and clarity
+4. This ensures business rules are enforced and consistency is maintained
+
