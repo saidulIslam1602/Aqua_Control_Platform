@@ -1,0 +1,338 @@
+# Theoretical Concepts: Queries in CQRS
+
+## 1. What is a Query?
+
+A **Query** represents a **request for information** - it does **not change state**.
+
+**Key Characteristics**:
+- **Read-Only**: Never modifies system state
+- **No Side Effects**: Can be called multiple times safely
+- **Returns Data**: Returns DTOs, collections, or single objects
+- **Optimized**: Can use views, caches, denormalized data
+- **Idempotent**: Safe to execute multiple times
+
+### Example in AquaCulture Platform:
+- ✅ `GetTanksQuery` - Get list of tanks
+- ✅ `GetTankByIdQuery` - Get single tank
+- ✅ `GetTankStatisticsQuery` - Get tank statistics
+- ❌ `CreateTankCommand` - This is a command, not a query
+
+---
+
+## 2. Query Structure
+
+### Basic Query Pattern
+
+```csharp
+// Query - expresses what data to retrieve
+public sealed record GetTanksQuery(
+    int Page = 1,
+    int PageSize = 10,
+    string? SearchTerm = null
+) : IQuery<PagedResult<TankDto>>;
+
+// Handler - executes the query
+public sealed class GetTanksQueryHandler 
+    : IQueryHandler<GetTanksQuery, PagedResult<TankDto>>
+{
+    public async Task<Result<PagedResult<TankDto>>> Handle(
+        GetTanksQuery query, 
+        CancellationToken cancellationToken)
+    {
+        // 1. Build filter/specification
+        // 2. Query read model
+        // 3. Map to DTOs
+        // 4. Return data
+    }
+}
+```
+
+### Key Components
+
+1. **Query**: Record type with filter parameters
+2. **Handler**: Class that executes the query
+3. **DTO**: Data Transfer Object (optimized for reading)
+4. **Result**: Wrapped in Result pattern for error handling
+
+---
+
+## 3. Query Naming Conventions
+
+### Best Practices
+
+**✅ Good Query Names**:
+- `GetTanksQuery` - Clear "Get" prefix
+- `GetTankByIdQuery` - Specific retrieval
+- `FindTanksByLocationQuery` - Search-oriented
+- `GetTankStatisticsQuery` - Data aggregation
+
+**❌ Bad Query Names**:
+- `TankQuery` - Too generic
+- `TanksQuery` - Not action-oriented
+- `ReadTankQuery` - Redundant "Read"
+- `TankDataQuery` - Vague
+
+### Pattern
+```
+Get[Entity][Filter]Query
+Examples:
+- GetTanksQuery
+- GetTankByIdQuery
+- GetTanksByLocationQuery
+- FindTanksQuery (alternative to Get)
+```
+
+---
+
+## 4. Query Types
+
+### Type 1: List Query (Paged)
+
+```csharp
+public record GetTanksQuery(
+    int Page,
+    int PageSize,
+    string? SearchTerm
+) : IQuery<PagedResult<TankDto>>;
+```
+
+**Returns**: Paged collection of DTOs
+
+### Type 2: Single Item Query
+
+```csharp
+public record GetTankByIdQuery(Guid Id) : IQuery<TankDto>;
+```
+
+**Returns**: Single DTO or null
+
+### Type 3: Filtered Query
+
+```csharp
+public record GetTanksByLocationQuery(
+    string Building,
+    string? Room
+) : IQuery<List<TankDto>>;
+```
+
+**Returns**: Filtered collection
+
+### Type 4: Aggregation Query
+
+```csharp
+public record GetTankStatisticsQuery() : IQuery<TankStatisticsDto>;
+```
+
+**Returns**: Aggregated data
+
+---
+
+## 5. Query Handler Pattern
+
+### Handler Responsibilities
+
+1. **Build Filter**: Create specification from query parameters
+2. **Query Data**: Read from repository/read model
+3. **Map to DTOs**: Transform domain models to DTOs
+4. **Return Data**: Return result with data
+
+### Example Handler
+
+```csharp
+public sealed class GetTanksQueryHandler 
+    : IQueryHandler<GetTanksQuery, PagedResult<TankDto>>
+{
+    private readonly ITankRepository _repository;
+    private readonly ILogger _logger;
+
+    public async Task<Result<PagedResult<TankDto>>> Handle(
+        GetTanksQuery query, 
+        CancellationToken ct)
+    {
+        // 1. Build specification
+        var spec = new TankFilterSpecification(
+            query.SearchTerm,
+            query.TankType,
+            query.IsActive);
+
+        // 2. Query repository
+        var (tanks, totalCount) = await _repository.GetPagedAsync(
+            spec,
+            query.Page,
+            query.PageSize,
+            ct);
+
+        // 3. Map to DTOs
+        var dtos = tanks.Select(tank => new TankDto
+        {
+            Id = tank.Id.Value,
+            Name = tank.Name,
+            Capacity = tank.Capacity.Value,
+            // ... map other properties
+        }).ToList();
+
+        // 4. Return paged result
+        return Result.Success(new PagedResult<TankDto>
+        {
+            Items = dtos,
+            TotalCount = totalCount,
+            Page = query.Page,
+            PageSize = query.PageSize,
+            TotalPages = (int)Math.Ceiling((double)totalCount / query.PageSize)
+        });
+    }
+}
+```
+
+---
+
+## 6. DTOs (Data Transfer Objects)
+
+### Why DTOs?
+
+**Domain Models** are optimized for:
+- Business logic
+- Validation
+- State changes
+
+**DTOs** are optimized for:
+- Data transfer
+- Serialization
+- API responses
+- Read performance
+
+### Example DTO
+
+```csharp
+public sealed class TankDto
+{
+    public Guid Id { get; init; }
+    public string Name { get; init; }
+    public decimal Capacity { get; init; }
+    public string CapacityUnit { get; init; }
+    public LocationDto Location { get; init; }
+    public string Status { get; init; }
+    public int SensorCount { get; init; }
+    // ... only what's needed for display
+}
+```
+
+**Key Points**:
+- **Init-only properties**: Immutable after creation
+- **Flattened structure**: Easy to serialize
+- **No business logic**: Just data
+- **Optimized**: Only includes needed fields
+
+---
+
+## 7. Query Flow
+
+### Complete Flow
+
+```
+1. API/UI sends query
+   └─> GetTanksQuery(page: 1, pageSize: 10)
+
+2. MediatR receives query
+   └─> Routes to GetTanksQueryHandler
+
+3. LoggingBehavior runs
+   └─> Logs request start
+
+4. Handler executes
+   └─> Builds specification
+   └─> Queries repository
+   └─> Maps to DTOs
+   └─> Returns result
+
+5. LoggingBehavior logs completion
+
+6. Result returned
+   └─> Success(PagedResult<TankDto>) or Failure(Error)
+```
+
+---
+
+## 8. Query Optimization
+
+### Read Models
+
+Queries can use optimized read models:
+- Denormalized views
+- Materialized views
+- Cached data
+- Separate read database
+
+### Example: Optimized Query
+
+```csharp
+// Instead of loading full aggregates
+var tanks = await _repository.GetAllAsync();
+
+// Use read model optimized for queries
+var tankDtos = await _readModel.GetTanksAsync(query.Filters);
+```
+
+---
+
+## 9. Query Best Practices
+
+### ✅ Do
+
+1. **Use DTOs**: Return DTOs, not domain models
+2. **Pagination**: Always paginate large collections
+3. **Filtering**: Support filtering in queries
+4. **Optimization**: Use read models when needed
+5. **Caching**: Cache frequently accessed data
+6. **No Side Effects**: Never modify state
+7. **Idempotent**: Safe to execute multiple times
+
+### ❌ Don't
+
+1. **Don't Modify State**: Queries are read-only
+2. **Don't Return Entities**: Return DTOs
+3. **Don't Skip Pagination**: Always paginate
+4. **Don't Load Everything**: Use filters
+5. **Don't Use Queries for Commands**: Use commands for writes
+
+---
+
+## 10. Real-World Analogy
+
+Think of a **Query** like asking a **question**:
+
+**Question (Query)**:
+- "What tanks are in Building A?" (request for information)
+- Doesn't change anything (just asking)
+- Returns answer (list of tanks)
+- Can ask multiple times (idempotent)
+
+**Answer (Query Handler)**:
+- Receives question
+- Looks up information
+- Formats answer (DTOs)
+- Returns answer
+
+**Key Points**:
+- Question expresses what you want to know
+- Question doesn't change state
+- Question returns information
+- Question can be asked multiple times safely
+
+---
+
+## 11. Summary
+
+**Queries** represent:
+- **Requests** for information
+- **Read-only** operations
+- **No state changes**
+
+**Structure**:
+- Query (record with filter parameters)
+- Handler (executes the query)
+- DTO (data transfer object)
+- Result (wrapped data or error)
+
+**Key Takeaway**: Queries are about **knowing** something, not **doing** something. They retrieve data, never modify state, and return DTOs optimized for reading.
+

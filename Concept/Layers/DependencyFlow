@@ -1,0 +1,466 @@
+# Theoretical Concepts: Dependency Flow in Clean Architecture
+
+## 1. The Dependency Rule
+
+### Core Principle
+
+**Dependencies point INWARD toward the Domain layer**
+
+```
+Outer Layers → Inner Layers
+     (depend on)
+```
+
+**The Domain layer has ZERO dependencies on other layers**
+
+---
+
+## 2. Layer Hierarchy
+
+### Standard Clean Architecture Layers
+
+```
+┌─────────────────────────────────────┐
+│   Presentation Layer (Outermost)   │
+│   - API Controllers                 │
+│   - GraphQL Resolvers               │
+│   - SignalR Hubs                    │
+└──────────────┬──────────────────────┘
+               │ depends on
+               ▼
+┌─────────────────────────────────────┐
+│   Application Layer                  │
+│   - Commands                         │
+│   - Queries                          │
+│   - Handlers                         │
+│   - DTOs                             │
+└──────────────┬──────────────────────┘
+               │ depends on
+               ▼
+┌─────────────────────────────────────┐
+│   Domain Layer (Core)                │
+│   - Aggregates                      │
+│   - Entities                        │
+│   - Value Objects                   │
+│   - Domain Events                   │
+│   - Business Rules                 │
+└─────────────────────────────────────┘
+               ▲
+               │ depends on
+┌──────────────┴──────────────────────┐
+│   Infrastructure Layer              │
+│   - Repositories                    │
+│   - Event Store                     │
+│   - External Services               │
+│   - Database                        │
+└─────────────────────────────────────┘
+```
+
+---
+
+## 3. Dependency Direction Explained
+
+### Why This Direction?
+
+**Domain Layer (Core)**:
+- Contains the most important code (business logic)
+- Should be independent and reusable
+- Should not know about technical details
+- Should not change when infrastructure changes
+
+**Outer Layers**:
+- Can depend on inner layers
+- Can use domain models
+- Can implement domain interfaces
+- Can change without affecting domain
+
+### The Rule in Practice
+
+```
+✅ Application → Domain (OK)
+✅ Presentation → Application (OK)
+✅ Presentation → Domain (OK, but usually goes through Application)
+✅ Infrastructure → Domain (OK, implements interfaces)
+
+❌ Domain → Application (FORBIDDEN)
+❌ Domain → Presentation (FORBIDDEN)
+❌ Domain → Infrastructure (FORBIDDEN, except interfaces)
+```
+
+---
+
+## 4. Dependency Inversion Principle
+
+### The Key Exception
+
+**Domain Layer can define INTERFACES** that Infrastructure implements:
+
+```csharp
+// Domain Layer - Defines interface
+namespace AquaControl.Domain.Common;
+
+public interface IRepository<T>
+{
+    Task<T?> GetByIdAsync(Guid id);
+    Task SaveAsync(T entity);
+}
+
+// Infrastructure Layer - Implements interface
+namespace AquaControl.Infrastructure.Persistence;
+
+public class TankRepository : IRepository<Tank>
+{
+    // Implementation using Entity Framework
+    public async Task<Tank?> GetByIdAsync(Guid id)
+    {
+        return await _context.Tanks.FindAsync(id);
+    }
+}
+```
+
+**Why This Works**:
+- Domain defines **what** is needed (interface)
+- Infrastructure provides **how** it's done (implementation)
+- Domain doesn't depend on Infrastructure
+- Infrastructure depends on Domain (implements interface)
+
+---
+
+## 5. Dependency Examples
+
+### Example 1: Application Uses Domain
+
+```csharp
+// ✅ CORRECT - Application depends on Domain
+
+// Domain Layer
+namespace AquaControl.Domain.Aggregates.TankAggregate;
+public sealed class Tank : AggregateRoot<TankId> { }
+
+// Application Layer
+namespace AquaControl.Application.Features.Tanks.Commands;
+using AquaControl.Domain.Aggregates.TankAggregate;  // ← Depends on Domain
+
+public class CreateTankCommandHandler
+{
+    public async Task<Result<Guid>> Handle(CreateTankCommand command)
+    {
+        var tank = Tank.Create(...);  // ← Uses Domain
+        return Result.Success(tank.Id.Value);
+    }
+}
+```
+
+### Example 2: Domain Defines Interface
+
+```csharp
+// ✅ CORRECT - Domain defines interface, Infrastructure implements
+
+// Domain Layer
+namespace AquaControl.Domain.Common;
+public interface IEventStore
+{
+    Task SaveAsync(IDomainEvent @event);
+}
+
+// Domain uses interface (not implementation)
+public class Tank : AggregateRoot<TankId>
+{
+    // Domain doesn't know about implementation
+    // Just knows about interface
+}
+
+// Infrastructure Layer
+namespace AquaControl.Infrastructure.EventStore;
+using AquaControl.Domain.Common;  // ← Depends on Domain
+
+public class EventStore : IEventStore
+{
+    // Implements interface defined in Domain
+    public async Task SaveAsync(IDomainEvent @event)
+    {
+        // Implementation using database
+    }
+}
+```
+
+### Example 3: Wrong Direction
+
+```csharp
+// ❌ WRONG - Domain depends on Application
+
+// Application Layer
+namespace AquaControl.Application.Features.Tanks.DTOs;
+public class TankDto { }
+
+// Domain Layer
+namespace AquaControl.Domain.Aggregates.TankAggregate;
+using AquaControl.Application.Features.Tanks.DTOs;  // ❌ FORBIDDEN
+
+public class Tank : AggregateRoot<TankId>
+{
+    public TankDto ToDto()  // ❌ Domain shouldn't know about DTOs
+    {
+        return new TankDto { ... };
+    }
+}
+```
+
+**Why Wrong?**:
+- Domain depends on Application (violates dependency rule)
+- Domain knows about DTOs (application concern)
+- Domain is no longer independent
+
+---
+
+## 6. Dependency Injection and Dependencies
+
+### How DI Works with Dependency Rule
+
+**Application Layer**:
+```csharp
+// Application Layer - Uses Domain interfaces
+public class CreateTankCommandHandler
+{
+    private readonly ITankRepository _repository;  // Interface from Domain
+    
+    public CreateTankCommandHandler(ITankRepository repository)
+    {
+        _repository = repository;  // Infrastructure implementation injected
+    }
+}
+```
+
+**Infrastructure Layer**:
+```csharp
+// Infrastructure Layer - Implements Domain interface
+public class TankRepository : ITankRepository  // Implements Domain interface
+{
+    // Implementation
+}
+```
+
+**Dependency Injection Container**:
+```csharp
+// Startup/DI Configuration
+services.AddScoped<ITankRepository, TankRepository>();
+// Infrastructure implementation registered for Domain interface
+```
+
+**Flow**:
+1. Application depends on `ITankRepository` (Domain interface)
+2. Infrastructure implements `ITankRepository`
+3. DI container provides Infrastructure implementation
+4. Application receives Infrastructure implementation
+5. Domain remains independent
+
+---
+
+## 7. Circular Dependencies Prevention
+
+### The Problem
+
+**Circular Dependency**:
+```
+Layer A → Layer B
+Layer B → Layer A  ❌ Circular!
+```
+
+### The Solution
+
+**Dependency Rule Prevents Circles**:
+```
+Presentation → Application → Domain
+Infrastructure → Domain
+
+No circles possible! ✅
+```
+
+**Why No Circles?**:
+- All dependencies point inward (toward Domain)
+- Domain has no dependencies
+- Can't form a circle
+
+---
+
+## 8. Testing and Dependencies
+
+### How Dependencies Affect Testing
+
+**Domain Layer Testing**:
+```csharp
+// Domain has no dependencies - easy to test
+[Fact]
+public void Tank_Create_ValidInput_ReturnsTank()
+{
+    // No mocks needed - pure domain logic
+    var capacity = TankCapacity.Create(100, "L");
+    var location = Location.Create("Building A", "Room 1");
+    
+    var tank = Tank.Create("Tank A", capacity, location, TankType.Freshwater);
+    
+    Assert.NotNull(tank);
+    Assert.Equal("Tank A", tank.Name);
+}
+```
+
+**Application Layer Testing**:
+```csharp
+// Application depends on Domain - can mock Domain or use real Domain
+[Fact]
+public async Task Handle_ValidCommand_ReturnsSuccess()
+{
+    // Mock Domain dependencies
+    var repository = new Mock<ITankRepository>();
+    var unitOfWork = new Mock<IUnitOfWork>();
+    
+    var handler = new CreateTankCommandHandler(
+        repository.Object,
+        unitOfWork.Object);
+    
+    // Test application logic
+    var result = await handler.Handle(new CreateTankCommand(...));
+    
+    Assert.True(result.IsSuccess);
+}
+```
+
+**Benefits**:
+- Domain tests are fast (no infrastructure)
+- Application tests can mock Domain
+- Clear separation makes testing easier
+
+---
+
+## 9. Real-World Analogy
+
+Think of **dependency flow** like a **building**:
+
+**Foundation (Domain Layer)**:
+- Strong, independent foundation
+- Doesn't depend on anything above
+- Everything else depends on it
+- Can't be removed or changed easily
+
+**Floors (Application Layer)**:
+- Built on foundation
+- Depends on foundation
+- Can be modified without affecting foundation
+- Uses foundation for support
+
+**Roof (Presentation Layer)**:
+- Built on floors
+- Depends on floors and foundation
+- Can be replaced without affecting foundation
+- Uses everything below
+
+**Utilities (Infrastructure Layer)**:
+- Connected to foundation
+- Implements foundation's requirements
+- Can be replaced (different utilities)
+- Foundation defines what's needed
+
+**Key Point**: Foundation (Domain) is independent. Everything else depends on it, but it doesn't depend on anything else.
+
+---
+
+## 10. Benefits of Correct Dependency Flow
+
+### 1. Independence
+
+**Domain Layer**:
+- Can be tested independently
+- Can be reused in different contexts
+- Not affected by infrastructure changes
+
+### 2. Flexibility
+
+**Easy to Change**:
+- Change database? Only Infrastructure changes
+- Change API? Only Presentation changes
+- Change use cases? Only Application changes
+- Business logic? Domain changes (carefully)
+
+### 3. Testability
+
+**Easy to Test**:
+- Domain: Pure unit tests
+- Application: Mock domain, test orchestration
+- Infrastructure: Integration tests
+- Presentation: API tests
+
+### 4. Maintainability
+
+**Clear Structure**:
+- Know where to find code
+- Know what depends on what
+- Easy to understand impact of changes
+
+---
+
+## 11. Common Violations
+
+### ❌ Violation 1: Domain Depends on Infrastructure
+
+```csharp
+// ❌ WRONG
+namespace AquaControl.Domain.Aggregates;
+using AquaControl.Infrastructure.Persistence;  // ❌ Domain depends on Infrastructure
+
+public class Tank
+{
+    private readonly DbContext _context;  // ❌ Domain knows about EF Core
+}
+```
+
+**✅ CORRECT**:
+```csharp
+// ✅ RIGHT
+namespace AquaControl.Domain.Common;
+public interface IRepository<T> { }  // Domain defines interface
+
+namespace AquaControl.Infrastructure.Persistence;
+public class TankRepository : IRepository<Tank> { }  // Infrastructure implements
+```
+
+### ❌ Violation 2: Domain Depends on Application
+
+```csharp
+// ❌ WRONG
+namespace AquaControl.Domain.Aggregates;
+using AquaControl.Application.Features.Tanks.DTOs;  // ❌ Domain depends on Application
+
+public class Tank
+{
+    public TankDto ToDto() { }  // ❌ Domain knows about DTOs
+}
+```
+
+**✅ CORRECT**:
+```csharp
+// ✅ RIGHT
+// Domain doesn't know about DTOs
+// Application maps Domain to DTOs
+public class GetTankQueryHandler
+{
+    public TankDto MapToDto(Tank tank)  // Application handles mapping
+    {
+        return new TankDto { ... };
+    }
+}
+```
+
+---
+
+## 12. Summary
+
+**Dependency Flow Rules**:
+
+1. **Dependencies point INWARD** (toward Domain)
+2. **Domain has ZERO dependencies** (except interfaces it defines)
+3. **Outer layers depend on inner layers**
+4. **Domain can define interfaces** (Infrastructure implements)
+5. **No circular dependencies** possible
+
+**Key Takeaway**: The dependency rule ensures that business logic (Domain) remains independent and reusable. All other layers depend on Domain, but Domain doesn't depend on them. This creates a stable core that can be tested, maintained, and reused independently.
+

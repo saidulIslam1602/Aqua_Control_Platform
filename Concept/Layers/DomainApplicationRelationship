@@ -1,0 +1,546 @@
+# Theoretical Concepts: Domain and Application Layer Relationship
+
+## 1. Overview: Two Layers, One Purpose
+
+The **Domain Layer** and **Application Layer** work together to implement business logic, but they have **different responsibilities** and **different concerns**.
+
+**Domain Layer**:
+- Contains **core business logic**
+- Defines **business rules**
+- Models **domain concepts**
+- **Independent** of infrastructure
+
+**Application Layer**:
+- **Orchestrates** domain operations
+- **Coordinates** between domain and infrastructure
+- Implements **use cases**
+- **Depends on** Domain layer
+
+---
+
+## 2. Dependency Direction
+
+### The Golden Rule
+
+```
+Application Layer → Domain Layer
+     (depends on)
+```
+
+**Key Principle**: 
+- ✅ Application Layer **depends on** Domain Layer
+- ❌ Domain Layer **never depends on** Application Layer
+- ✅ Domain Layer has **zero dependencies** on other layers
+
+### Why This Direction?
+
+**Domain Layer is the Core**:
+- Contains the most important business logic
+- Should be independent and reusable
+- Should not know about application concerns
+- Should not know about infrastructure
+
+**Application Layer Orchestrates**:
+- Uses domain models to implement use cases
+- Coordinates domain operations
+- Handles application-specific concerns
+- Can depend on domain (it's the foundation)
+
+---
+
+## 3. What Each Layer Contains
+
+### Domain Layer Contents
+
+```
+Domain Layer
+├── Aggregates (Tank, Sensor)
+├── Entities (base classes)
+├── Value Objects (TankCapacity, Location)
+├── Domain Events (TankCreatedEvent)
+├── Enums (TankType, TankStatus)
+├── Business Rules (validation logic)
+└── Domain Services (if needed)
+```
+
+**Characteristics**:
+- Pure business logic
+- No infrastructure dependencies
+- No framework dependencies (except MediatR for events)
+- Self-contained and testable
+
+### Application Layer Contents
+
+```
+Application Layer
+├── Commands (CreateTankCommand)
+├── Queries (GetTanksQuery)
+├── Handlers (CreateTankCommandHandler)
+├── DTOs (TankDto)
+├── Validators (FluentValidation)
+├── Specifications (TankFilterSpecification)
+├── Behaviors (ValidationBehavior)
+└── Interfaces (ITankRepository)
+```
+
+**Characteristics**:
+- Orchestrates domain operations
+- Handles application concerns
+- Depends on Domain layer
+- Uses infrastructure (via interfaces)
+
+---
+
+## 4. How They Work Together
+
+### Example: Creating a Tank
+
+**Step 1: Application Layer Receives Command**
+```csharp
+// Application Layer
+public class CreateTankCommandHandler
+{
+    public async Task<Result<Guid>> Handle(CreateTankCommand command)
+    {
+        // Step 2: Application creates Domain value objects
+        var capacity = TankCapacity.Create(command.Capacity, command.CapacityUnit);
+        var location = Location.Create(command.Building, command.Room);
+        
+        // Step 3: Application calls Domain factory method
+        var tank = Tank.Create(command.Name, capacity, location, command.TankType);
+        
+        // Step 4: Application saves via repository (infrastructure)
+        await _repository.AddAsync(tank);
+        await _unitOfWork.SaveChangesAsync();
+        
+        // Step 5: Application returns result
+        return Result.Success(tank.Id.Value);
+    }
+}
+```
+
+**Step 2: Domain Layer Creates Aggregate**
+```csharp
+// Domain Layer
+public sealed class Tank : AggregateRoot<TankId>
+{
+    public static Tank Create(string name, TankCapacity capacity, Location location, TankType tankType)
+    {
+        // Domain validates business rules
+        if (string.IsNullOrWhiteSpace(name))
+            throw new ArgumentException("Tank name cannot be empty");
+        
+        // Domain creates aggregate
+        var tankId = TankId.Create();
+        var tank = new Tank(tankId, name, capacity, location, tankType);
+        
+        // Domain raises event
+        tank.Apply(new TankCreatedEvent(tankId, name, capacity, location, tankType));
+        
+        return tank;
+    }
+}
+```
+
+**Flow Diagram**:
+```
+Application Layer                    Domain Layer
+     │                                    │
+     │ 1. Receives Command               │
+     │    CreateTankCommand               │
+     │         │                          │
+     │ 2. Creates Value Objects           │
+     │    TankCapacity.Create() ──────────>│
+     │    Location.Create() ──────────────>│
+     │         │                          │
+     │ 3. Calls Domain Factory            │
+     │    Tank.Create() ─────────────────>│
+     │         │                          │
+     │         │                          │ 4. Domain validates
+     │         │                          │    and creates aggregate
+     │         │                          │
+     │         │<─────────────────────────│ 5. Returns Tank
+     │         │                          │
+     │ 6. Saves via Repository            │
+     │    (Infrastructure)                │
+     │         │                          │
+     │ 7. Returns Result                  │
+```
+
+---
+
+## 5. Dependency Flow
+
+### Clean Architecture Dependency Rule
+
+```
+┌─────────────────────────────────────┐
+│      Presentation Layer              │
+│  (API Controllers, GraphQL)         │
+└──────────────┬──────────────────────┘
+               │ depends on
+               ▼
+┌─────────────────────────────────────┐
+│      Application Layer              │
+│  (Commands, Queries, Handlers)      │
+└──────────────┬──────────────────────┘
+               │ depends on
+               ▼
+┌─────────────────────────────────────┐
+│        Domain Layer                 │
+│  (Aggregates, Entities, Events)     │
+└─────────────────────────────────────┘
+               ▲
+               │ depends on
+┌──────────────┴──────────────────────┐
+│     Infrastructure Layer            │
+│  (Repositories, Event Store, DB)    │
+└─────────────────────────────────────┘
+```
+
+**Key Points**:
+- Dependencies point **inward** (toward Domain)
+- Domain has **no dependencies** on other layers
+- Application depends on Domain
+- Infrastructure depends on Domain (implements interfaces)
+
+---
+
+## 6. Communication Patterns
+
+### Pattern 1: Application Calls Domain
+
+**Application orchestrates, Domain executes**:
+
+```csharp
+// Application Layer
+public class UpdateTankCommandHandler
+{
+    public async Task<Result> Handle(UpdateTankCommand command)
+    {
+        // Application loads domain aggregate
+        var tank = await _repository.GetByIdAsync(tankId);
+        
+        // Application calls domain method
+        tank.UpdateName(command.Name);        // ← Domain method
+        tank.UpdateCapacity(capacity);        // ← Domain method
+        tank.Relocate(location);              // ← Domain method
+        
+        // Application saves
+        await _repository.UpdateAsync(tank);
+        return Result.Success();
+    }
+}
+```
+
+### Pattern 2: Domain Raises Events
+
+**Domain raises events, Application handles them**:
+
+```csharp
+// Domain Layer
+public sealed class Tank : AggregateRoot<TankId>
+{
+    public void Activate()
+    {
+        if (Status == TankStatus.Active) return;
+        
+        // Domain validates business rule
+        if (!_sensors.Any(s => s.IsActive))
+            throw new InvalidOperationException("Must have active sensor");
+        
+        Status = TankStatus.Active;
+        
+        // Domain raises event
+        Apply(new TankActivatedEvent(Id));  // ← Event raised
+    }
+}
+
+// Application Layer
+public class TankActivatedEventHandler : INotificationHandler<TankActivatedEvent>
+{
+    public async Task Handle(TankActivatedEvent notification, CancellationToken ct)
+    {
+        // Application reacts to domain event
+        _logger.LogInformation("Tank activated: {TankId}", notification.TankId);
+        // Could send notifications, update read models, etc.
+    }
+}
+```
+
+### Pattern 3: Application Uses Domain Value Objects
+
+**Application creates value objects, Domain validates**:
+
+```csharp
+// Application Layer
+public class CreateTankCommandHandler
+{
+    public async Task<Result<Guid>> Handle(CreateTankCommand command)
+    {
+        // Application creates value objects (Domain validates)
+        var capacity = TankCapacity.Create(
+            command.Capacity, 
+            command.CapacityUnit);  // ← Domain validates
+        
+        var location = Location.Create(
+            command.Building,
+            command.Room,
+            command.Zone);  // ← Domain validates
+        
+        // Use validated value objects
+        var tank = Tank.Create(command.Name, capacity, location, tankType);
+    }
+}
+```
+
+---
+
+## 7. Responsibilities Separation
+
+### Domain Layer Responsibilities
+
+**✅ Domain Layer Should**:
+- Define business rules
+- Validate business logic
+- Enforce invariants
+- Raise domain events
+- Model domain concepts
+
+**❌ Domain Layer Should NOT**:
+- Know about databases
+- Know about APIs
+- Know about external services
+- Handle HTTP requests
+- Know about DTOs
+
+### Application Layer Responsibilities
+
+**✅ Application Layer Should**:
+- Orchestrate domain operations
+- Handle use cases
+- Map between DTOs and domain models
+- Coordinate infrastructure
+- Handle application-level validation
+
+**❌ Application Layer Should NOT**:
+- Contain business rules (belongs in Domain)
+- Directly access databases (use repositories)
+- Know about HTTP (belongs in Presentation)
+- Contain domain logic (belongs in Domain)
+
+---
+
+## 8. Example: Complete Flow
+
+### Creating a Tank - Full Flow
+
+```
+1. API Controller (Presentation Layer)
+   └─> Receives HTTP POST /api/tanks
+   └─> Creates CreateTankCommand
+   └─> Sends to MediatR
+
+2. MediatR (Application Layer)
+   └─> Routes to CreateTankCommandHandler
+
+3. ValidationBehavior (Application Layer)
+   └─> Validates CreateTankCommand
+   └─> Uses FluentValidation
+
+4. CreateTankCommandHandler (Application Layer)
+   └─> Checks if tank exists (via repository)
+   └─> Creates TankCapacity value object (Domain)
+   └─> Creates Location value object (Domain)
+   └─> Calls Tank.Create() (Domain)
+       └─> Domain validates business rules
+       └─> Domain creates aggregate
+       └─> Domain raises TankCreatedEvent
+   └─> Saves tank (via repository)
+   └─> Commits changes (Unit of Work)
+
+5. TankCreatedEventHandler (Application Layer)
+   └─> Reacts to domain event
+   └─> Logs, sends notifications, etc.
+
+6. Result returned to Controller
+   └─> Returns HTTP 201 Created with tank ID
+```
+
+---
+
+## 9. Benefits of This Separation
+
+### 1. Testability
+
+**Domain Layer**:
+- Can test business logic in isolation
+- No infrastructure needed
+- Fast unit tests
+
+**Application Layer**:
+- Can test use cases
+- Can mock domain and infrastructure
+- Integration tests possible
+
+### 2. Maintainability
+
+**Clear Boundaries**:
+- Know where to find business rules (Domain)
+- Know where to find use cases (Application)
+- Easy to locate code
+
+**Independent Changes**:
+- Can change application without affecting domain
+- Can change domain (carefully) without breaking application
+- Clear impact analysis
+
+### 3. Reusability
+
+**Domain Layer**:
+- Can be reused in different applications
+- Can be used in different contexts
+- Business logic is portable
+
+**Application Layer**:
+- Use cases are clear and documented
+- Can be reused in different presentations
+- Easy to understand
+
+---
+
+## 10. Common Mistakes
+
+### ❌ Mistake 1: Domain Depends on Application
+
+```csharp
+// ❌ BAD - Domain depends on Application
+public class Tank : AggregateRoot<TankId>
+{
+    public void Activate()
+    {
+        // ❌ Domain shouldn't know about DTOs
+        var dto = new TankDto { ... };
+        
+        // ❌ Domain shouldn't call application services
+        _notificationService.SendAlert(dto);
+    }
+}
+```
+
+**✅ CORRECT - Application depends on Domain**
+
+```csharp
+// ✅ GOOD - Domain is independent
+public class Tank : AggregateRoot<TankId>
+{
+    public void Activate()
+    {
+        Status = TankStatus.Active;
+        Apply(new TankActivatedEvent(Id));  // Raise event
+    }
+}
+
+// Application handles the event
+public class TankActivatedEventHandler
+{
+    public async Task Handle(TankActivatedEvent e)
+    {
+        _notificationService.SendAlert(e.TankId);  // Application reacts
+    }
+}
+```
+
+### ❌ Mistake 2: Business Logic in Application
+
+```csharp
+// ❌ BAD - Business logic in Application
+public class CreateTankCommandHandler
+{
+    public async Task<Result<Guid>> Handle(CreateTankCommand command)
+    {
+        // ❌ Business rule in Application layer
+        if (command.Capacity <= 0)
+            return Error.Validation("Invalid capacity");
+        
+        // ❌ Business logic in Application
+        if (command.Name.Length > 100)
+            return Error.Validation("Name too long");
+    }
+}
+```
+
+**✅ CORRECT - Business Logic in Domain**
+
+```csharp
+// ✅ GOOD - Business logic in Domain
+public static TankCapacity Create(decimal value, string unit)
+{
+    // ✅ Domain validates business rules
+    if (value <= 0)
+        throw new ArgumentException("Capacity must be positive");
+    
+    return new TankCapacity(value, unit);
+}
+
+// Application just uses domain
+public class CreateTankCommandHandler
+{
+    public async Task<Result<Guid>> Handle(CreateTankCommand command)
+    {
+        // ✅ Application delegates to Domain
+        var capacity = TankCapacity.Create(command.Capacity, command.CapacityUnit);
+    }
+}
+```
+
+---
+
+## 11. Real-World Analogy
+
+Think of **Domain and Application** like a **restaurant**:
+
+**Domain Layer (Kitchen/Recipes)**:
+- Contains recipes (business rules)
+- Defines how to cook (domain logic)
+- Independent of restaurant type
+- Can be used in any restaurant
+
+**Application Layer (Restaurant Operations)**:
+- Takes orders (commands)
+- Follows recipes (uses domain)
+- Coordinates kitchen (orchestrates)
+- Handles customer service (application concerns)
+
+**Relationship**:
+- Restaurant (Application) uses recipes (Domain)
+- Recipes (Domain) don't know about restaurant (Application)
+- Restaurant (Application) depends on recipes (Domain)
+- Recipes (Domain) are independent and reusable
+
+---
+
+## 12. Summary
+
+**Domain and Application Layers**:
+
+**Domain Layer**:
+- Core business logic
+- Independent and reusable
+- No dependencies on other layers
+- Contains aggregates, entities, value objects
+
+**Application Layer**:
+- Orchestrates domain operations
+- Implements use cases
+- Depends on Domain layer
+- Contains commands, queries, handlers
+
+**Relationship**:
+- Application **depends on** Domain
+- Domain is **independent**
+- They **work together** to implement business logic
+- Clear **separation of concerns**
+
+**Key Takeaway**: Domain layer is the foundation containing pure business logic. Application layer orchestrates domain operations to implement use cases. The dependency always flows from Application to Domain, never the reverse. This ensures business logic remains independent, testable, and reusable.
+

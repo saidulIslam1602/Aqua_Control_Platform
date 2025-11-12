@@ -1,0 +1,322 @@
+# Theoretical Concepts: Handlers in CQRS with MediatR
+
+## 1. What is a Handler?
+
+A **Handler** is a class that **processes** a command or query. It contains the business logic to execute the requested operation.
+
+**Key Characteristics**:
+- **Single Responsibility**: One handler per command/query
+- **Business Logic**: Contains the actual work
+- **Dependency Injection**: Receives dependencies via constructor
+- **Async**: Typically async operations
+- **Result**: Returns Result pattern
+
+### Example in AquaCulture Platform:
+- `CreateTankCommandHandler` - Handles tank creation
+- `GetTanksQueryHandler` - Handles tank retrieval
+- `UpdateTankCommandHandler` - Handles tank updates
+
+---
+
+## 2. Handler Types
+
+### Command Handler
+
+**Purpose**: Executes commands (write operations)
+
+```csharp
+public sealed class CreateTankCommandHandler 
+    : ICommandHandler<CreateTankCommand, Guid>
+{
+    public async Task<Result<Guid>> Handle(
+        CreateTankCommand command, 
+        CancellationToken cancellationToken)
+    {
+        // Business logic here
+    }
+}
+```
+
+**Responsibilities**:
+- Validate business rules
+- Create/update domain aggregates
+- Save to repository
+- Return result
+
+### Query Handler
+
+**Purpose**: Executes queries (read operations)
+
+```csharp
+public sealed class GetTanksQueryHandler 
+    : IQueryHandler<GetTanksQuery, PagedResult<TankDto>>
+{
+    public async Task<Result<PagedResult<TankDto>>> Handle(
+        GetTanksQuery query, 
+        CancellationToken cancellationToken)
+    {
+        // Data retrieval logic here
+    }
+}
+```
+
+**Responsibilities**:
+- Build filters/specifications
+- Query repository
+- Map to DTOs
+- Return data
+
+---
+
+## 3. Handler Structure
+
+### Complete Handler Example
+
+```csharp
+public sealed class CreateTankCommandHandler 
+    : ICommandHandler<CreateTankCommand, Guid>
+{
+    // Dependencies injected via constructor
+    private readonly ITankRepository _repository;
+    private readonly IUnitOfWork _unitOfWork;
+    private readonly ILogger<CreateTankCommandHandler> _logger;
+
+    // Constructor injection
+    public CreateTankCommandHandler(
+        ITankRepository repository,
+        IUnitOfWork unitOfWork,
+        ILogger<CreateTankCommandHandler> logger)
+    {
+        _repository = repository;
+        _unitOfWork = unitOfWork;
+        _logger = logger;
+    }
+
+    // Handle method - implements the interface
+    public async Task<Result<Guid>> Handle(
+        CreateTankCommand command, 
+        CancellationToken cancellationToken)
+    {
+        // 1. Logging
+        _logger.LogInformation("Creating tank: {Name}", command.Name);
+
+        try
+        {
+            // 2. Validation
+            var existing = await _repository.GetByNameAsync(command.Name, cancellationToken);
+            if (existing != null)
+            {
+                return Error.Conflict("Tank.Exists", "Tank already exists");
+            }
+
+            // 3. Business Logic
+            var capacity = TankCapacity.Create(command.Capacity, command.CapacityUnit);
+            var location = Location.Create(command.Building, command.Room);
+            var tank = Tank.Create(command.Name, capacity, location, command.TankType);
+
+            // 4. Persistence
+            await _repository.AddAsync(tank, cancellationToken);
+            await _unitOfWork.SaveChangesAsync(cancellationToken);
+
+            // 5. Success
+            _logger.LogInformation("Tank created: {Id}", tank.Id.Value);
+            return Result.Success(tank.Id.Value);
+        }
+        catch (Exception ex)
+        {
+            // 6. Error Handling
+            _logger.LogError(ex, "Error creating tank");
+            return Error.Failure("Tank.CreationFailed", "An error occurred");
+        }
+    }
+}
+```
+
+---
+
+## 4. MediatR Integration
+
+### What is MediatR?
+
+**MediatR** is a library that implements the **Mediator Pattern**:
+- Decouples senders from receivers
+- Routes requests to appropriate handlers
+- Supports dependency injection
+- Provides pipeline behaviors
+
+### How It Works
+
+```csharp
+// 1. Send command/query
+var result = await _mediator.Send(new CreateTankCommand(...));
+
+// 2. MediatR finds handler
+//    - Looks for ICommandHandler<CreateTankCommand, Guid>
+//    - Finds CreateTankCommandHandler
+
+// 3. Executes handler
+//    - Calls Handle method
+//    - Returns result
+
+// 4. Returns result to caller
+```
+
+### Automatic Discovery
+
+MediatR automatically:
+- Discovers handlers via reflection
+- Registers them with DI container
+- Routes requests to correct handler
+- No manual wiring needed
+
+---
+
+## 5. Handler Lifecycle
+
+### Request Flow
+
+```
+1. API/Controller
+   └─> await _mediator.Send(command)
+
+2. MediatR
+   └─> Finds handler
+   └─> Resolves dependencies
+   └─> Executes pipeline behaviors
+
+3. Pipeline Behaviors (in order)
+   └─> LoggingBehavior (logs start)
+   └─> ValidationBehavior (validates)
+   └─> [Other behaviors]
+
+4. Handler
+   └─> Handle method executes
+   └─> Business logic runs
+   └─> Returns result
+
+5. Pipeline Behaviors (reverse order)
+   └─> LoggingBehavior (logs completion)
+
+6. Result returned to caller
+```
+
+---
+
+## 6. Dependency Injection
+
+### Constructor Injection
+
+Handlers receive dependencies via constructor:
+
+```csharp
+public CreateTankCommandHandler(
+    ITankRepository repository,        // Repository
+    IUnitOfWork unitOfWork,            // Unit of Work
+    ILogger<CreateTankCommandHandler> logger)  // Logger
+{
+    _repository = repository;
+    _unitOfWork = unitOfWork;
+    _logger = logger;
+}
+```
+
+**Benefits**:
+- Dependencies are explicit
+- Easy to test (can mock dependencies)
+- Loose coupling
+- Framework handles creation
+
+---
+
+## 7. Handler Best Practices
+
+### ✅ Do
+
+1. **Single Responsibility**: One handler, one operation
+2. **Use Dependencies**: Inject what you need
+3. **Logging**: Log important operations
+4. **Error Handling**: Handle errors gracefully
+5. **Async**: Use async/await for I/O operations
+6. **Cancellation Tokens**: Accept CancellationToken
+7. **Result Pattern**: Return Result, not exceptions
+
+### ❌ Don't
+
+1. **Don't Mix Concerns**: Keep handlers focused
+2. **Don't Skip Validation**: Validate in handlers
+3. **Don't Ignore Errors**: Always handle errors
+4. **Don't Use Static**: Use dependency injection
+5. **Don't Return Entities**: Return DTOs or IDs
+
+---
+
+## 8. Testing Handlers
+
+### Unit Testing
+
+```csharp
+[Fact]
+public async Task Handle_ValidCommand_ReturnsSuccess()
+{
+    // Arrange
+    var repository = new Mock<ITankRepository>();
+    var unitOfWork = new Mock<IUnitOfWork>();
+    var logger = new Mock<ILogger<CreateTankCommandHandler>>();
+    
+    var handler = new CreateTankCommandHandler(
+        repository.Object,
+        unitOfWork.Object,
+        logger.Object);
+    
+    var command = new CreateTankCommand("Tank A", 100, "L", ...);
+
+    // Act
+    var result = await handler.Handle(command, CancellationToken.None);
+
+    // Assert
+    Assert.True(result.IsSuccess);
+    Assert.NotEqual(Guid.Empty, result.Value);
+}
+```
+
+---
+
+## 9. Real-World Analogy
+
+Think of a **Handler** like a **restaurant chef**:
+
+**Order (Command/Query)**:
+- Customer places order
+- Order sent to kitchen
+
+**Chef (Handler)**:
+- Receives order
+- Has tools (dependencies)
+- Follows recipe (business logic)
+- Prepares food (executes operation)
+- Returns result (food ready or error)
+
+**Key Points**:
+- Chef specializes in one type of dish (single responsibility)
+- Chef has tools (dependencies)
+- Chef follows process (business logic)
+- Chef returns result (success or failure)
+
+---
+
+## 10. Summary
+
+**Handlers** are:
+- **Processors** of commands/queries
+- **Business logic** containers
+- **Dependency injected** classes
+- **Single responsibility** focused
+
+**Structure**:
+- Implements `ICommandHandler` or `IQueryHandler`
+- Receives dependencies via constructor
+- Implements `Handle` method
+- Returns `Result` pattern
+
+**Key Takeaway**: Handlers contain the business logic for processing commands and queries. They are automatically discovered by MediatR and executed when commands/queries are sent. Keep them focused, testable, and well-structured.
+

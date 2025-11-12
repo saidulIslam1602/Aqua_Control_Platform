@@ -1,0 +1,318 @@
+# Theoretical Concepts: Commands in CQRS
+
+## 1. What is a Command?
+
+A **Command** represents an **intent** to perform an action that will **change the state** of the system.
+
+**Key Characteristics**:
+- **Intent**: Expresses what you want to **do** (not what happened)
+- **State Change**: Commands modify system state
+- **Validation**: Business rules are enforced
+- **Idempotency**: Can be designed to be idempotent (safe to retry)
+- **Result**: Returns success/failure, not data
+
+### Example in AquaCulture Platform:
+- ✅ `CreateTankCommand` - Intent to create a new tank
+- ✅ `UpdateTankCommand` - Intent to update an existing tank
+- ✅ `ActivateTankCommand` - Intent to activate a tank
+- ❌ `GetTankQuery` - This is a query, not a command
+
+---
+
+## 2. Command Structure
+
+### Basic Command Pattern
+
+```csharp
+// Command - expresses intent
+public sealed record CreateTankCommand(
+    string Name,
+    decimal Capacity,
+    TankType TankType
+) : ICommand<Guid>;
+
+// Handler - executes the command
+public sealed class CreateTankCommandHandler 
+    : ICommandHandler<CreateTankCommand, Guid>
+{
+    public async Task<Result<Guid>> Handle(
+        CreateTankCommand command, 
+        CancellationToken cancellationToken)
+    {
+        // 1. Validate
+        // 2. Execute business logic
+        // 3. Save changes
+        // 4. Return result
+    }
+}
+```
+
+### Key Components
+
+1. **Command**: Record type with input parameters
+2. **Handler**: Class that executes the command
+3. **Result**: Success/failure with optional return value
+4. **Validator**: (Optional) FluentValidation rules
+
+---
+
+## 3. Command Naming Conventions
+
+### Best Practices
+
+**✅ Good Command Names**:
+- `CreateTankCommand` - Clear action verb
+- `UpdateTankCommand` - Past tense verb
+- `ActivateTankCommand` - Action-oriented
+- `ScheduleMaintenanceCommand` - Descriptive
+
+**❌ Bad Command Names**:
+- `TankCommand` - Too generic
+- `TankCreationCommand` - Noun, not verb
+- `DoTankCommand` - Vague action
+- `TankDataCommand` - Not action-oriented
+
+### Pattern
+```
+[ActionVerb][Entity]Command
+Examples:
+- CreateTankCommand
+- UpdateTankCommand
+- DeleteTankCommand
+- ActivateTankCommand
+```
+
+---
+
+## 4. Command Types
+
+### Type 1: Command with Return Value
+
+```csharp
+public record CreateTankCommand(...) : ICommand<Guid>;
+// Returns the ID of the created entity
+```
+
+**Use When**:
+- Need to return created entity ID
+- Need to return computed value
+- Need to return confirmation data
+
+### Type 2: Command without Return Value
+
+```csharp
+public record UpdateTankCommand(...) : ICommand;
+// Just success/failure
+```
+
+**Use When**:
+- No return value needed
+- Just need to know success/failure
+- Simple state changes
+
+---
+
+## 5. Command Handler Pattern
+
+### Handler Responsibilities
+
+1. **Validation**: Check business rules
+2. **Domain Logic**: Execute business operations
+3. **Persistence**: Save changes
+4. **Events**: Publish domain events
+5. **Result**: Return success/failure
+
+### Example Handler
+
+```csharp
+public sealed class CreateTankCommandHandler 
+    : ICommandHandler<CreateTankCommand, Guid>
+{
+    private readonly ITankRepository _repository;
+    private readonly IUnitOfWork _unitOfWork;
+    private readonly ILogger _logger;
+
+    public async Task<Result<Guid>> Handle(
+        CreateTankCommand command, 
+        CancellationToken ct)
+    {
+        // 1. Check if tank already exists
+        var existing = await _repository.GetByNameAsync(command.Name, ct);
+        if (existing != null)
+        {
+            return Error.Conflict("Tank.Exists", "Tank already exists");
+        }
+
+        // 2. Create domain aggregate
+        var capacity = TankCapacity.Create(command.Capacity, command.CapacityUnit);
+        var location = Location.Create(command.Building, command.Room);
+        var tank = Tank.Create(command.Name, capacity, location, command.TankType);
+
+        // 3. Save to repository
+        await _repository.AddAsync(tank, ct);
+        await _unitOfWork.SaveChangesAsync(ct);
+
+        // 4. Return success with ID
+        return Result.Success(tank.Id.Value);
+    }
+}
+```
+
+---
+
+## 6. Command Validation
+
+### FluentValidation Pattern
+
+```csharp
+public sealed class CreateTankCommandValidator 
+    : AbstractValidator<CreateTankCommand>
+{
+    public CreateTankCommandValidator()
+    {
+        RuleFor(x => x.Name)
+            .NotEmpty().WithMessage("Name is required")
+            .MaximumLength(100).WithMessage("Name too long");
+
+        RuleFor(x => x.Capacity)
+            .GreaterThan(0).WithMessage("Capacity must be positive");
+    }
+}
+```
+
+### Validation Behavior
+
+MediatR pipeline automatically validates commands:
+1. Command sent
+2. ValidationBehavior intercepts
+3. Validators run
+4. If invalid → return error
+5. If valid → continue to handler
+
+---
+
+## 7. Command Flow
+
+### Complete Flow
+
+```
+1. API/UI sends command
+   └─> CreateTankCommand(name: "Tank A", ...)
+
+2. MediatR receives command
+   └─> Routes to CreateTankCommandHandler
+
+3. ValidationBehavior runs
+   └─> Validates input
+   └─> If invalid → return error
+
+4. LoggingBehavior runs
+   └─> Logs request start
+
+5. Handler executes
+   └─> Business logic
+   └─> Domain aggregate creation
+   └─> Repository save
+   └─> Unit of Work commit
+
+6. Domain events published
+   └─> TankCreatedEvent
+
+7. LoggingBehavior logs completion
+
+8. Result returned
+   └─> Success(Guid) or Failure(Error)
+```
+
+---
+
+## 8. Error Handling
+
+### Result Pattern
+
+Commands return `Result<T>` or `Result`:
+
+```csharp
+// Success
+return Result.Success(tankId);
+
+// Failure - Validation
+return Error.Validation("Tank.Invalid", "Invalid tank data");
+
+// Failure - Not Found
+return Error.NotFound("Tank.NotFound", "Tank not found");
+
+// Failure - Conflict
+return Error.Conflict("Tank.Exists", "Tank already exists");
+```
+
+### Error Types
+
+- **Validation**: Input validation failed
+- **NotFound**: Resource doesn't exist
+- **Conflict**: Business rule violation
+- **Failure**: Unexpected error
+
+---
+
+## 9. Command Best Practices
+
+### ✅ Do
+
+1. **Use Records**: Immutable command objects
+2. **Clear Names**: Action-oriented naming
+3. **Single Responsibility**: One command, one action
+4. **Validation**: Validate in validators
+5. **Idempotency**: Design for safe retries when possible
+6. **Logging**: Log important operations
+7. **Error Handling**: Return meaningful errors
+
+### ❌ Don't
+
+1. **Don't Return Entities**: Return IDs or DTOs
+2. **Don't Mix Concerns**: Keep commands focused
+3. **Don't Skip Validation**: Always validate
+4. **Don't Ignore Errors**: Handle all errors
+5. **Don't Use Commands for Queries**: Use queries for reading
+
+---
+
+## 10. Real-World Analogy
+
+Think of a **Command** like a **restaurant order**:
+
+**Order (Command)**:
+- "I want a pizza" (intent)
+- Contains what you want (parameters)
+- Changes state (kitchen starts cooking)
+- Returns result (order number or error)
+
+**Order Handler (Command Handler)**:
+- Receives order
+- Validates (do we have ingredients?)
+- Executes (cooks pizza)
+- Returns result (order number)
+
+**Key Points**:
+- Order expresses intent (not what happened)
+- Order changes state (kitchen is now busy)
+- Order returns result (order number)
+- Order can fail (out of ingredients)
+
+---
+
+## 11. Summary
+
+**Commands** represent:
+- **Intent** to perform an action
+- **State changes** in the system
+- **Business operations** (create, update, delete)
+
+**Structure**:
+- Command (record with parameters)
+- Handler (executes the command)
+- Validator (validates input)
+- Result (success/failure)
+
+**Key Takeaway**: Commands are about **doing** something, not **knowing** something. They change state, enforce business rules, and return results indicating success or failure.
+
