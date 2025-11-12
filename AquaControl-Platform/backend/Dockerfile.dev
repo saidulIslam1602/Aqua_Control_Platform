@@ -20,9 +20,9 @@ RUN dotnet restore "src/AquaControl.API/AquaControl.API.csproj"
 # Copy source code
 COPY . .
 
-# Install dotnet tools
-RUN dotnet tool install --global dotnet-ef
-ENV PATH="$PATH:/root/.dotnet/tools"
+# Install dotnet tools (commented out - migrations can be run separately if needed)
+# RUN dotnet tool install --global dotnet-ef
+# ENV PATH="$PATH:/root/.dotnet/tools"
 
 # Build application
 WORKDIR "/app/src/AquaControl.API"

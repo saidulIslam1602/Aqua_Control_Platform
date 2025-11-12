@@ -1,0 +1,292 @@
+services:
+  # ===========================================
+  # Database Services
+  # ===========================================
+  
+  # TimescaleDB - Primary Database
+  timescaledb:
+    image: timescale/timescaledb:latest-pg15
+    container_name: aquacontrol-timescaledb-prod
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: aquacontrol_prod
+      POSTGRES_USER: aquacontrol
+      POSTGRES_PASSWORD_FILE: /run/secrets/db_password
+      POSTGRES_INITDB_ARGS: "--auth-host=scram-sha-256"
+      # Production tuning
+      POSTGRES_SHARED_BUFFERS: 512MB
+      POSTGRES_EFFECTIVE_CACHE_SIZE: 2GB
+      POSTGRES_WORK_MEM: 32MB
+      POSTGRES_MAINTENANCE_WORK_MEM: 256MB
+      POSTGRES_MAX_CONNECTIONS: 200
+    ports:
+      - "5432:5432"
+    volumes:
+      - timescale_data:/var/lib/postgresql/data
+      - ./docker/scripts/init-timescale.sql:/docker-entrypoint-initdb.d/01-init-timescale.sql
+      - ./docker/scripts/create-hypertables.sql:/docker-entrypoint-initdb.d/02-create-hypertables.sql
+      - ./backups:/backups
+    networks:
+      - aquacontrol-network
+    secrets:
+      - db_password
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U aquacontrol -d aquacontrol_prod"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+        reservations:
+          memory: 1G
+
+  # Redis - Caching and Session Store
+  redis:
+    image: redis:7-alpine
+    container_name: aquacontrol-redis-prod
+    restart: unless-stopped
+    command: redis-server --appendonly yes --requirepass-file /run/secrets/redis_password --maxmemory 512mb --maxmemory-policy allkeys-lru
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - aquacontrol-network
+    secrets:
+      - redis_password
+    healthcheck:
+      test: ["CMD", "redis-cli", "--no-auth-warning", "-a", "$(cat /run/secrets/redis_password)", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+        reservations:
+          memory: 256M
+
+  # ===========================================
+  # Application Services
+  # ===========================================
+  
+  # Backend API
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.prod
+    container_name: aquacontrol-backend-prod
+    restart: unless-stopped
+    environment:
+      # ASP.NET Core settings
+      - ASPNETCORE_ENVIRONMENT=Production
+      - ASPNETCORE_URLS=http://+:5000
+      - ASPNETCORE_LOGGING__LOGLEVEL__DEFAULT=Warning
+      
+      # Database connections
+      - ConnectionStrings__DefaultConnection=Host=timescaledb;Port=5432;Database=aquacontrol_prod;Username=aquacontrol;Password_File=/run/secrets/db_password;Include Error Detail=false
+      - ConnectionStrings__Redis=redis:6379,password_file=/run/secrets/redis_password
+      
+      # JWT settings
+      - JwtSettings__SecretKey_File=/run/secrets/jwt_secret
+      - JwtSettings__Issuer=AquaControl.API
+      - JwtSettings__Audience=AquaControl.Client
+      - JwtSettings__ExpirationMinutes=60
+      
+      # Kafka settings
+      - Kafka__BootstrapServers=kafka:29092
+      - Kafka__GroupId=aquacontrol-backend-prod
+      
+      # Security settings
+      - Security__RequireHttps=true
+      - Security__EnableHsts=true
+      - Security__HstsMaxAge=31536000
+    ports:
+      - "5000:5000"
+    depends_on:
+      timescaledb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - aquacontrol-network
+    volumes:
+      - backend_logs:/app/logs
+    secrets:
+      - db_password
+      - redis_password
+      - jwt_secret
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+        reservations:
+          memory: 512M
+
+  # Frontend Application
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.prod
+    container_name: aquacontrol-frontend-prod
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - aquacontrol-network
+    volumes:
+      - ./ssl:/etc/nginx/ssl:ro
+      - nginx_logs:/var/log/nginx
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:80/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+        reservations:
+          memory: 128M
+
+  # ===========================================
+  # Monitoring Services
+  # ===========================================
+  
+  # Prometheus - Metrics Collection
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: aquacontrol-prometheus-prod
+    restart: unless-stopped
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=30d'
+      - '--web.enable-lifecycle'
+      - '--web.enable-admin-api'
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./docker/configs/prometheus/prometheus.prod.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    networks:
+      - aquacontrol-network
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+        reservations:
+          memory: 256M
+
+  # Grafana - Metrics Visualization
+  grafana:
+    image: grafana/grafana:latest
+    container_name: aquacontrol-grafana-prod
+    restart: unless-stopped
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD_FILE=/run/secrets/grafana_password
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_INSTALL_PLUGINS=grafana-clock-panel,grafana-simple-json-datasource
+      - GF_SERVER_ROOT_URL=https://monitoring.aquacontrol.com
+      - GF_SECURITY_COOKIE_SECURE=true
+      - GF_SECURITY_STRICT_TRANSPORT_SECURITY=true
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./docker/configs/grafana/dashboards:/etc/grafana/provisioning/dashboards
+      - ./docker/configs/grafana/datasources:/etc/grafana/provisioning/datasources
+    depends_on:
+      - prometheus
+    networks:
+      - aquacontrol-network
+    secrets:
+      - grafana_password
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+        reservations:
+          memory: 128M
+
+  # ===========================================
+  # Backup Service
+  # ===========================================
+  
+  # Database Backup
+  backup:
+    image: postgres:15-alpine
+    container_name: aquacontrol-backup-prod
+    restart: "no"
+    environment:
+      - PGPASSWORD_FILE=/run/secrets/db_password
+    volumes:
+      - ./backups:/backups
+      - ./scripts/backup.sh:/backup.sh
+    networks:
+      - aquacontrol-network
+    secrets:
+      - db_password
+    entrypoint: ["/backup.sh"]
+    depends_on:
+      - timescaledb
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+
+# ===========================================
+# Volumes
+# ===========================================
+volumes:
+  timescale_data:
+    driver: local
+  redis_data:
+    driver: local
+  prometheus_data:
+    driver: local
+  grafana_data:
+    driver: local
+  backend_logs:
+    driver: local
+  nginx_logs:
+    driver: local
+
+# ===========================================
+# Networks
+# ===========================================
+networks:
+  aquacontrol-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.31.0.0/16
+
+# ===========================================
+# Secrets
+# ===========================================
+secrets:
+  db_password:
+    file: ./secrets/db_password.txt
+  redis_password:
+    file: ./secrets/redis_password.txt
+  jwt_secret:
+    file: ./secrets/jwt_secret.txt
+  grafana_password:
+    file: ./secrets/grafana_password.txt

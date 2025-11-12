@@ -42,6 +42,10 @@
     
     <!-- CORS -->
     <PackageReference Include="Microsoft.AspNetCore.Cors" Version="2.2.0" />
+    
+    
+    <!-- Additional Security -->
+    <PackageReference Include="Microsoft.AspNetCore.DataProtection" Version="8.0.0" />
   </ItemGroup>
 
   <ItemGroup>

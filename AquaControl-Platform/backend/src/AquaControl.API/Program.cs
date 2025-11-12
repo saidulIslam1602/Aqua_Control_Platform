@@ -33,9 +33,12 @@ try
     builder.Services.AddInfrastructureServices(builder.Configuration);
     builder.Services.AddAuthenticationServices(builder.Configuration);
     builder.Services.AddCorsServices();
+    // Rate limiting will be added later with proper .NET 8 implementation
     builder.Services.AddHealthCheckServices(builder.Configuration);
-    builder.Services.AddSignalR();
+    builder.Services.AddValidationServices();
     builder.Services.AddSignalRServices();
+    builder.Services.AddSecurityServices();
+    builder.Services.AddHttpClient();
     
     // Add GraphQL (commented out until GraphQL types are implemented)
     // builder.Services
@@ -60,12 +63,19 @@ try
         });
     }
 
-    // Add custom middleware
+    // Add custom middleware (order matters!)
+    app.UseMiddleware<SecurityHeadersMiddleware>();
+    app.UseMiddleware<PerformanceMiddleware>();
     app.UseMiddleware<ExceptionHandlingMiddleware>();
     app.UseMiddleware<RequestLoggingMiddleware>();
 
     app.UseHttpsRedirection();
-    app.UseCors("AllowAll");
+    app.UseHsts(); // Add HSTS in production
+    // Rate limiter will be added later
+    
+    // Use environment-specific CORS policy
+    var corsPolicy = app.Environment.IsDevelopment() ? "AllowAll" : "Production";
+    app.UseCors(corsPolicy);
     
     app.UseAuthentication();
     app.UseAuthorization();

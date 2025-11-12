@@ -1,11 +1,12 @@
-using Microsoft.OpenApi.Models;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.IdentityModel.Tokens;
+using Microsoft.OpenApi.Models;
+using System.Reflection;
 using System.Text;
-using AquaControl.API.Hubs;
-using Microsoft.Extensions.Diagnostics.HealthChecks;
-using AquaControl.Infrastructure.ReadModels;
-using Microsoft.EntityFrameworkCore;
+using AquaControl.Infrastructure.Services;
+using FluentValidation;
+using FluentValidation.AspNetCore;
 
 namespace AquaControl.API.Extensions;
 
@@ -17,18 +18,24 @@ public static class ServiceExtensions
         {
             c.SwaggerDoc("v1", new OpenApiInfo
             {
-                Title = "AquaControl API",
-                Version = "v1",
-                Description = "Advanced Aquaculture Control System API",
+                Title = "AquaControl Platform API",
+                Version = "v1.0.0",
+                Description = "A comprehensive aquaculture management platform API",
                 Contact = new OpenApiContact
                 {
                     Name = "AquaControl Team",
-                    Email = "support@aquacontrol.com"
+                    Email = "support@aquacontrol.com",
+                    Url = new Uri("https://aquacontrol.com")
+                },
+                License = new OpenApiLicense
+                {
+                    Name = "MIT License",
+                    Url = new Uri("https://opensource.org/licenses/MIT")
                 }
             });
 
             // Include XML comments
-            var xmlFile = $"{System.Reflection.Assembly.GetExecutingAssembly().GetName().Name}.xml";
+            var xmlFile = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
             var xmlPath = System.IO.Path.Combine(AppContext.BaseDirectory, xmlFile);
             if (File.Exists(xmlPath))
             {
@@ -38,7 +45,7 @@ public static class ServiceExtensions
             // Add JWT authentication to Swagger
             c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
             {
-                Description = "JWT Authorization header using the Bearer scheme. Enter 'Bearer' [space] and then your token in the text input below.",
+                Description = "JWT Authorization header using the Bearer scheme. Example: \"Authorization: Bearer {token}\"",
                 Name = "Authorization",
                 In = ParameterLocation.Header,
                 Type = SecuritySchemeType.ApiKey,
@@ -59,6 +66,9 @@ public static class ServiceExtensions
                     Array.Empty<string>()
                 }
             });
+
+            // Add operation filters for better documentation
+            // c.EnableAnnotations(); // Requires Swashbuckle.AspNetCore.Annotations package
         });
 
         return services;
@@ -68,6 +78,7 @@ public static class ServiceExtensions
     {
         var jwtSettings = configuration.GetSection("JwtSettings");
         var secretKey = jwtSettings["SecretKey"] ?? throw new InvalidOperationException("JWT SecretKey is not configured");
+        var key = Encoding.ASCII.GetBytes(secretKey);
 
         services.AddAuthentication(options =>
         {
@@ -76,16 +87,19 @@ public static class ServiceExtensions
         })
         .AddJwtBearer(options =>
         {
+            options.RequireHttpsMetadata = false; // Set to true in production
+            options.SaveToken = true;
             options.TokenValidationParameters = new TokenValidationParameters
             {
-                ValidateIssuer = true,
-                ValidateAudience = true,
-                ValidateLifetime = true,
                 ValidateIssuerSigningKey = true,
+                IssuerSigningKey = new SymmetricSecurityKey(key),
+                ValidateIssuer = true,
                 ValidIssuer = jwtSettings["Issuer"],
+                ValidateAudience = true,
                 ValidAudience = jwtSettings["Audience"],
-                IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secretKey)),
-                ClockSkew = TimeSpan.Zero
+                ValidateLifetime = true,
+                ClockSkew = TimeSpan.Zero,
+                RequireExpirationTime = true
             };
 
             // Add SignalR support
@@ -100,10 +114,21 @@ public static class ServiceExtensions
                     {
                         context.Token = accessToken;
                     }
-                    
                     return Task.CompletedTask;
                 }
             };
+        });
+
+        services.AddAuthorization(options =>
+        {
+            options.AddPolicy("RequireAdministratorRole", policy =>
+                policy.RequireRole("Administrator"));
+            
+            options.AddPolicy("RequireUserRole", policy =>
+                policy.RequireRole("User", "Administrator"));
+
+            options.AddPolicy("RequireValidUser", policy =>
+                policy.RequireAuthenticatedUser());
         });
 
         return services;
@@ -134,50 +159,58 @@ public static class ServiceExtensions
         return services;
     }
 
+    // Rate limiting removed for now - can be added with proper .NET 8 implementation later
+
     public static IServiceCollection AddHealthCheckServices(this IServiceCollection services, IConfiguration configuration)
     {
         services.AddHealthChecks()
-            .AddNpgSql(configuration.GetConnectionString("DefaultConnection")!)
-            .AddCheck<DatabaseHealthCheck>("database");
+            .AddNpgSql(
+                connectionString: configuration.GetConnectionString("DefaultConnection")!,
+                name: "postgresql",
+                tags: new[] { "database", "postgresql" })
+            .AddRedis(configuration.GetConnectionString("Redis")!)
+            .AddCheck<ApplicationHealthCheck>("application")
+            .AddCheck<ExternalServiceHealthCheck>("external-services");
 
         return services;
     }
-}
 
-// Register SignalR service
-public static class SignalRServiceExtensions
-{
+    public static IServiceCollection AddValidationServices(this IServiceCollection services)
+    {
+        services.AddFluentValidationAutoValidation();
+        services.AddFluentValidationClientsideAdapters();
+        services.AddValidatorsFromAssembly(Assembly.GetExecutingAssembly());
+
+        return services;
+    }
+
     public static IServiceCollection AddSignalRServices(this IServiceCollection services)
     {
-        services.AddScoped<ISignalRService, SignalRService>();
+        services.AddSignalR(options =>
+        {
+            options.EnableDetailedErrors = true;
+            options.KeepAliveInterval = TimeSpan.FromSeconds(15);
+            options.ClientTimeoutInterval = TimeSpan.FromSeconds(30);
+        });
+
+        return services;
+    }
+
+    public static IServiceCollection AddSecurityServices(this IServiceCollection services)
+    {
+        services.AddAntiforgery(options =>
+        {
+            options.HeaderName = "X-XSRF-TOKEN";
+            options.SuppressXFrameOptionsHeader = false;
+        });
+
+        services.AddHsts(options =>
+        {
+            options.Preload = true;
+            options.IncludeSubDomains = true;
+            options.MaxAge = TimeSpan.FromDays(365);
+        });
+
         return services;
     }
 }
-
-// Custom health checks
-public class DatabaseHealthCheck : IHealthCheck
-{
-    private readonly IServiceProvider _serviceProvider;
-
-    public DatabaseHealthCheck(IServiceProvider serviceProvider)
-    {
-        _serviceProvider = serviceProvider;
-    }
-
-    public async Task<HealthCheckResult> CheckHealthAsync(HealthCheckContext context, CancellationToken cancellationToken = default)
-    {
-        try
-        {
-            using var scope = _serviceProvider.CreateScope();
-            var dbContext = scope.ServiceProvider.GetRequiredService<ReadModelDbContext>();
-            
-            await dbContext.Database.CanConnectAsync(cancellationToken);
-            return HealthCheckResult.Healthy("Database connection is healthy");
-        }
-        catch (Exception ex)
-        {
-            return HealthCheckResult.Unhealthy("Database connection failed", ex);
-        }
-    }
-}
-

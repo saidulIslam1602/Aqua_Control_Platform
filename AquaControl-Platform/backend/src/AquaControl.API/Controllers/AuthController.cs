@@ -45,18 +45,19 @@ public class AuthController : ControllerBase
                     Email = "admin@aquacontrol.com",
                     FirstName = "Admin",
                     LastName = "User",
-                    Roles = new[] { "Administrator", "User" }
+                    Roles = new[] { "Administrator", "User" },
+                    CreatedAt = DateTime.UtcNow,
+                    LastLoginAt = DateTime.UtcNow
                 };
 
                 var (accessToken, refreshToken) = GenerateTokens(user);
 
-                var response = new LoginResponse
-                {
-                    AccessToken = accessToken,
-                    RefreshToken = refreshToken,
-                    ExpiresIn = 3600, // 1 hour
-                    User = user
-                };
+                var response = new LoginResponse(
+                    accessToken,
+                    refreshToken,
+                    user,
+                    DateTime.UtcNow.AddHours(1)
+                );
 
                 _logger.LogInformation("Login successful for username: {Username}", request.Username);
                 return Task.FromResult<ActionResult<LoginResponse>>(Ok(response));
@@ -93,17 +94,18 @@ public class AuthController : ControllerBase
                 Email = "admin@aquacontrol.com",
                 FirstName = "Admin",
                 LastName = "User",
-                Roles = new[] { "Administrator", "User" }
+                Roles = new[] { "Administrator", "User" },
+                CreatedAt = DateTime.UtcNow,
+                LastLoginAt = DateTime.UtcNow
             };
 
             var (accessToken, refreshToken) = GenerateTokens(user);
 
-            var response = new TokenResponse
-            {
-                AccessToken = accessToken,
-                RefreshToken = refreshToken,
-                ExpiresIn = 3600
-            };
+            var response = new TokenResponse(
+                accessToken,
+                refreshToken,
+                DateTime.UtcNow.AddHours(1)
+            );
 
             _logger.LogInformation("Token refresh successful");
             return Task.FromResult<ActionResult<TokenResponse>>(Ok(response));
@@ -218,32 +220,3 @@ public class AuthController : ControllerBase
     }
 }
 
-// DTOs
-public record LoginRequest(string Username, string Password);
-
-public record RefreshTokenRequest(string RefreshToken);
-
-public record LoginResponse
-{
-    public string AccessToken { get; init; } = string.Empty;
-    public string RefreshToken { get; init; } = string.Empty;
-    public int ExpiresIn { get; init; }
-    public UserDto User { get; init; } = new();
-}
-
-public record TokenResponse
-{
-    public string AccessToken { get; init; } = string.Empty;
-    public string RefreshToken { get; init; } = string.Empty;
-    public int ExpiresIn { get; init; }
-}
-
-public record UserDto
-{
-    public string Id { get; init; } = string.Empty;
-    public string Username { get; init; } = string.Empty;
-    public string Email { get; init; } = string.Empty;
-    public string FirstName { get; init; } = string.Empty;
-    public string LastName { get; init; } = string.Empty;
-    public string[] Roles { get; init; } = Array.Empty<string>();
-}

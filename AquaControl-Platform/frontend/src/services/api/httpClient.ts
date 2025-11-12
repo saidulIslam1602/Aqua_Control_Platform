@@ -49,7 +49,7 @@ class HttpClient {
         const configWithMetadata = config as any
         configWithMetadata.metadata = { startTime: Date.now() }
 
-        console.log(`🚀 API Request: ${config.method?.toUpperCase()} ${config.url}`, {
+        console.log(`API Request: ${config.method?.toUpperCase()} ${config.url}`, {
           headers: config.headers,
           data: config.data
         })
@@ -57,7 +57,7 @@ class HttpClient {
         return config
       },
       (error) => {
-        console.error('❌ Request Error:', error)
+        console.error('Request Error:', error)
         return Promise.reject(error)
       }
     )
@@ -67,7 +67,7 @@ class HttpClient {
       (response: AxiosResponse) => {
         const duration = Date.now() - ((response.config as any).metadata?.startTime || 0)
         
-        console.log(`✅ API Response: ${response.status} ${response.config.url} (${duration}ms)`, {
+        console.log(`API Response: ${response.status} ${response.config.url} (${duration}ms)`, {
           data: response.data,
           headers: response.headers
         })
@@ -77,7 +77,7 @@ class HttpClient {
       async (error) => {
         const duration = Date.now() - (error.config?.metadata?.startTime || 0)
         
-        console.error(`❌ API Error: ${error.response?.status || 'Network'} ${error.config?.url} (${duration}ms)`, {
+        console.error(`API Error: ${error.response?.status || 'Network'} ${error.config?.url} (${duration}ms)`, {
           error: error.response?.data,
           status: error.response?.status
         })
