@@ -1,5 +1,9 @@
 using AquaControl.Application.Features.Tanks.Commands.CreateTank;
 using AquaControl.Application.Features.Tanks.Commands.UpdateTank;
+using AquaControl.Application.Features.Tanks.Commands.DeleteTank;
+using AquaControl.Application.Features.Tanks.Commands.ActivateTank;
+using AquaControl.Application.Features.Tanks.Commands.DeactivateTank;
+using AquaControl.Application.Features.Tanks.Commands.ScheduleMaintenance;
 using AquaControl.Application.Features.Tanks.Queries.GetTanks;
 using AquaControl.Application.Features.Tanks.Queries.GetTankById;
 using AquaControl.Application.Common.Models;
@@ -127,7 +131,7 @@ public class TanksController : ControllerBase
         [FromBody] UpdateTankRequest request,
         CancellationToken cancellationToken = default)
     {
-        _logger.LogInformation("Updating tank: {TankId}", id);
+        _logger.LogInformation("Updating tank with ID: {TankId}", id);
 
         var command = new UpdateTankCommand(
             id,
@@ -148,12 +152,132 @@ public class TanksController : ControllerBase
             return result.Error.Type switch
             {
                 ErrorType.NotFound => NotFound(result.Error),
+                ErrorType.Validation => BadRequest(result.Error),
                 _ => BadRequest(result.Error)
             };
         }
 
         var tankDto = await GetTankById(id, cancellationToken);
         return Ok(tankDto.Value);
+    }
+
+    /// <summary>
+    /// Delete a tank
+    /// </summary>
+    [HttpDelete("{id:guid}")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [AllowAnonymous]
+    public async Task<ActionResult> DeleteTank(
+        Guid id,
+        CancellationToken cancellationToken = default)
+    {
+        _logger.LogInformation("Deleting tank with ID: {TankId}", id);
+
+        var command = new DeleteTankCommand(id);
+        var result = await _mediator.Send(command, cancellationToken);
+
+        if (result.IsFailure)
+        {
+            return result.Error.Type switch
+            {
+                ErrorType.NotFound => NotFound(result.Error),
+                _ => BadRequest(result.Error)
+            };
+        }
+
+        return NoContent();
+    }
+
+    /// <summary>
+    /// Activate a tank
+    /// </summary>
+    [HttpPost("{id:guid}/activate")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [AllowAnonymous]
+    public async Task<ActionResult> ActivateTank(
+        Guid id,
+        CancellationToken cancellationToken = default)
+    {
+        _logger.LogInformation("Activating tank with ID: {TankId}", id);
+
+        var command = new ActivateTankCommand(id);
+        var result = await _mediator.Send(command, cancellationToken);
+
+        if (result.IsFailure)
+        {
+            return result.Error.Type switch
+            {
+                ErrorType.NotFound => NotFound(result.Error),
+                ErrorType.Conflict => Conflict(result.Error),
+                _ => BadRequest(result.Error)
+            };
+        }
+
+        return Ok();
+    }
+
+    /// <summary>
+    /// Deactivate a tank
+    /// </summary>
+    [HttpPost("{id:guid}/deactivate")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [AllowAnonymous]
+    public async Task<ActionResult> DeactivateTank(
+        Guid id,
+        [FromBody] DeactivateTankRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        _logger.LogInformation("Deactivating tank with ID: {TankId}, Reason: {Reason}", id, request.Reason);
+
+        var command = new DeactivateTankCommand(id, request.Reason);
+        var result = await _mediator.Send(command, cancellationToken);
+
+        if (result.IsFailure)
+        {
+            return result.Error.Type switch
+            {
+                ErrorType.NotFound => NotFound(result.Error),
+                _ => BadRequest(result.Error)
+            };
+        }
+
+        return Ok();
+    }
+
+    /// <summary>
+    /// Schedule maintenance for a tank
+    /// </summary>
+    [HttpPost("{id:guid}/schedule-maintenance")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [AllowAnonymous]
+    public async Task<ActionResult> ScheduleMaintenance(
+        Guid id,
+        [FromBody] ScheduleMaintenanceRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        _logger.LogInformation("Scheduling maintenance for tank with ID: {TankId}, Date: {MaintenanceDate}", id, request.MaintenanceDate);
+
+        var command = new ScheduleMaintenanceCommand(id, request.MaintenanceDate, request.Notes);
+        var result = await _mediator.Send(command, cancellationToken);
+
+        if (result.IsFailure)
+        {
+            return result.Error.Type switch
+            {
+                ErrorType.NotFound => NotFound(result.Error),
+                ErrorType.Validation => BadRequest(result.Error),
+                _ => BadRequest(result.Error)
+            };
+        }
+
+        return Ok();
     }
 }
 
@@ -179,4 +303,8 @@ public record UpdateTankRequest(
     decimal? Latitude,
     decimal? Longitude,
     TankType TankType);
+
+public record DeactivateTankRequest(string Reason);
+
+public record ScheduleMaintenanceRequest(DateTime MaintenanceDate, string? Notes);
 

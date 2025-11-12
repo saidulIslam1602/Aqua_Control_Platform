@@ -1,0 +1,428 @@
+# Testing - Comprehensive Test Strategy
+
+## 1. What is Testing?
+
+**Testing** is the practice of verifying that software behaves correctly, meets requirements, and handles edge cases properly. In the AquaControl platform, testing ensures reliability, maintainability, and confidence in code changes.
+
+**Key Components**:
+- **Unit Tests** - Test individual components in isolation
+- **Integration Tests** - Test component interactions
+- **Performance Tests** - Test system under load
+- **End-to-End Tests** - Test complete user workflows
+
+---
+
+## 2. Why Testing?
+
+### Benefits
+
+**1. Code Quality**:
+- Catches bugs early in development
+- Prevents regressions
+- Ensures business rules are enforced
+- Validates edge cases
+
+**2. Refactoring Confidence**:
+- Safe code changes
+- Immediate feedback on breaking changes
+- Documentation through tests
+- Living specification
+
+**3. Documentation**:
+- Tests serve as usage examples
+- Show expected behavior
+- Document business rules
+- Guide API usage
+
+**4. Continuous Integration**:
+- Automated test execution
+- Prevents broken code from being merged
+- Fast feedback loop
+- Quality gates
+
+---
+
+## 3. Testing Architecture
+
+### Test Structure
+
+```
+tests/
+├── unit/
+│   ├── backend/
+│   │   └── AquaControl.Tests.Unit/
+│   │       ├── Domain/
+│   │       │   ├── TankTests.cs
+│   │       │   └── ValueObjects/
+│   │       │       └── TankCapacityTests.cs
+│   │       └── Application/
+│   │           └── CreateTankCommandHandlerTests.cs
+│   └── frontend/
+│       ├── vitest.config.ts
+│       ├── test-setup.ts
+│       └── stores/
+│           └── tankStore.test.ts
+└── integration/
+    └── api/
+        └── AquaControl.Tests.Integration/
+            └── TanksControllerTests.cs
+```
+
+### Test Categories
+
+**1. Backend Unit Tests**:
+- Domain layer tests (aggregates, value objects)
+- Application layer tests (command/query handlers)
+- Infrastructure layer tests (repositories, services)
+
+**2. Frontend Unit Tests**:
+- Component tests (Vue components)
+- Store tests (Pinia stores)
+- Service tests (API services)
+- Utility function tests
+
+**3. Integration Tests**:
+- API endpoint tests
+- Database integration tests
+- SignalR hub tests
+- External service integration tests
+
+**4. Performance Tests**:
+- Load testing
+- Stress testing
+- Database performance tests
+- Memory leak detection
+
+**5. End-to-End Tests**:
+- User workflow tests
+- Cross-browser tests
+- Mobile device tests
+- Accessibility tests
+
+---
+
+## 4. Backend Testing
+
+### Domain Layer Tests
+
+**Purpose**: Test business logic and domain rules
+
+**Example - Tank Aggregate Tests**:
+```csharp
+[Fact]
+public void Create_WithValidParameters_ShouldCreateTank()
+{
+    // Arrange
+    var name = "Test Tank";
+    var capacity = TankCapacity.Create(1000, "L");
+    var location = Location.Create("Building A", "Room 1");
+    var tankType = TankType.Freshwater;
+
+    // Act
+    var tank = Tank.Create(name, capacity, location, tankType);
+
+    // Assert
+    tank.Should().NotBeNull();
+    tank.Name.Should().Be(name);
+    tank.Status.Should().Be(TankStatus.Inactive);
+    tank.DomainEvents.Should().ContainSingle()
+        .Which.Should().BeOfType<TankCreatedEvent>();
+}
+```
+
+**Key Testing Areas**:
+- Aggregate creation and validation
+- Business rule enforcement
+- Domain event raising
+- State transitions
+- Invariant preservation
+
+### Value Object Tests
+
+**Purpose**: Test immutable value objects
+
+**Example - TankCapacity Tests**:
+```csharp
+[Fact]
+public void ConvertTo_FromLitersToMilliliters_ShouldConvertCorrectly()
+{
+    // Arrange
+    var capacity = TankCapacity.Create(1, "L");
+
+    // Act
+    var converted = capacity.ConvertTo("ML");
+
+    // Assert
+    converted.Value.Should().Be(1000);
+    converted.Unit.Should().Be("ML");
+}
+```
+
+**Key Testing Areas**:
+- Value object creation
+- Validation rules
+- Conversion logic
+- Equality comparison
+- Immutability
+
+### Application Layer Tests
+
+**Purpose**: Test use case orchestration
+
+**Example - Command Handler Tests**:
+```csharp
+[Fact]
+public async Task Handle_WithValidCommand_ShouldCreateTankSuccessfully()
+{
+    // Arrange
+    var command = new CreateTankCommand(...);
+    _tankRepositoryMock
+        .Setup(x => x.GetByNameAsync(...))
+        .ReturnsAsync((Tank?)null);
+
+    // Act
+    var result = await _handler.Handle(command, CancellationToken.None);
+
+    // Assert
+    result.IsSuccess.Should().BeTrue();
+    _tankRepositoryMock.Verify(
+        x => x.AddAsync(It.IsAny<Tank>(), It.IsAny<CancellationToken>()),
+        Times.Once);
+}
+```
+
+**Key Testing Areas**:
+- Command/query handling
+- Repository interactions
+- Error handling
+- Result pattern usage
+- Business rule validation
+
+**Testing Tools**:
+- **xUnit** - Test framework
+- **FluentAssertions** - Readable assertions
+- **Moq** - Mocking framework
+- **AutoFixture** - Test data generation
+- **Bogus** - Fake data generation
+
+---
+
+## 5. Frontend Testing
+
+### Component Tests
+
+**Purpose**: Test Vue component behavior
+
+**Example - Component Test**:
+```typescript
+it('should render tank information correctly', () => {
+  const wrapper = mount(TankCard, {
+    props: { tank: mockTank }
+  })
+
+  expect(wrapper.text()).toContain('Test Tank')
+  expect(wrapper.text()).toContain('Active')
+})
+```
+
+**Key Testing Areas**:
+- Component rendering
+- User interactions
+- Event emissions
+- Props validation
+- Computed properties
+
+### Store Tests
+
+**Purpose**: Test Pinia store logic
+
+**Example - Store Test**:
+```typescript
+it('should compute active tanks correctly', () => {
+  const store = useTankStore()
+  
+  store.tanks = [
+    createMockTank('1', 'Active'),
+    createMockTank('2', 'Inactive'),
+    createMockTank('3', 'Active'),
+  ]
+
+  expect(store.activeTanks).toHaveLength(2)
+})
+```
+
+**Key Testing Areas**:
+- State management
+- Computed properties
+- Actions and mutations
+- Optimistic updates
+- Error handling
+
+**Testing Tools**:
+- **Vitest** - Fast unit test framework
+- **@vue/test-utils** - Vue component testing utilities
+- **jsdom** - DOM environment for tests
+- **vi.mock** - Module mocking
+
+---
+
+## 6. Integration Tests
+
+### API Integration Tests
+
+**Purpose**: Test complete API request/response flow
+
+**Example - API Test**:
+```csharp
+[Fact]
+public async Task CreateTank_WithValidData_ShouldReturnCreated()
+{
+    // Arrange
+    var createRequest = new { name = "Test Tank", ... };
+
+    // Act
+    var response = await _client.PostAsJsonAsync("/api/tanks", createRequest);
+
+    // Assert
+    response.StatusCode.Should().Be(HttpStatusCode.Created);
+}
+```
+
+**Key Testing Areas**:
+- HTTP endpoint behavior
+- Request validation
+- Response formatting
+- Status codes
+- Error handling
+
+**Testing Tools**:
+- **WebApplicationFactory** - In-memory test server
+- **HttpClient** - HTTP client for testing
+- **In-Memory Database** - Isolated database for tests
+
+---
+
+## 7. Test Execution
+
+### Running Tests
+
+**Backend Unit Tests**:
+```bash
+cd tests/unit/backend/AquaControl.Tests.Unit
+dotnet test
+```
+
+**Frontend Unit Tests**:
+```bash
+cd frontend
+npm run test:unit
+```
+
+**Integration Tests**:
+```bash
+cd tests/integration/api/AquaControl.Tests.Integration
+dotnet test
+```
+
+**With Coverage**:
+```bash
+# Backend
+dotnet test --collect:"XPlat Code Coverage"
+
+# Frontend
+npm run test:coverage
+```
+
+### Continuous Integration
+
+**GitHub Actions / Azure DevOps**:
+- Run tests on every commit
+- Run tests on pull requests
+- Generate coverage reports
+- Fail builds on test failures
+- Publish test results
+
+---
+
+## 8. Testing Best Practices
+
+### Test Organization
+
+**1. Arrange-Act-Assert Pattern**:
+- Clear test structure
+- Easy to read and understand
+- Consistent across all tests
+
+**2. Test Naming**:
+- Descriptive test names
+- Include scenario and expected outcome
+- Use consistent naming convention
+
+**3. Test Isolation**:
+- Each test is independent
+- No shared state between tests
+- Clean up after each test
+
+**4. Mock External Dependencies**:
+- Mock repositories
+- Mock external services
+- Mock file system
+- Mock network calls
+
+### Test Coverage
+
+**Target Coverage**:
+- Domain layer: 90%+ (critical business logic)
+- Application layer: 80%+ (use cases)
+- Infrastructure layer: 70%+ (implementation details)
+- Frontend: 75%+ (user-facing code)
+
+**Coverage Tools**:
+- **Coverlet** - .NET code coverage
+- **Vitest Coverage** - Frontend code coverage
+- **SonarQube** - Code quality and coverage analysis
+
+---
+
+## 9. Test Data Management
+
+### Test Fixtures
+
+**Purpose**: Reusable test data
+
+**Example**:
+```csharp
+private static Tank CreateValidTank()
+{
+    var capacity = TankCapacity.Create(1000, "L");
+    var location = Location.Create("Building A", "Room 1");
+    return Tank.Create("Test Tank", capacity, location, TankType.Freshwater);
+}
+```
+
+### Test Builders
+
+**Purpose**: Flexible test data creation
+
+**Example**:
+```csharp
+var tank = new TankBuilder()
+    .WithName("Test Tank")
+    .WithCapacity(1000, "L")
+    .WithLocation("Building A", "Room 1")
+    .Build();
+```
+
+---
+
+## 10. Summary
+
+**Testing Provides**:
+- Confidence in code changes
+- Early bug detection
+- Living documentation
+- Refactoring safety
+- Quality assurance
+
+**Key Takeaway**: Comprehensive testing ensures the AquaControl platform is reliable, maintainable, and meets business requirements. Tests serve as both quality gates and documentation, enabling safe refactoring and continuous improvement.
+

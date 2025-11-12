@@ -1,0 +1,11 @@
+{
+  "Version": 1,
+  "Hash": "qrB+XvnWlb3zluVmyRXdBeXkee2GirrG1bh3eYyYb4w=",
+  "Source": "AquaControl.API",
+  "BasePath": "_content/AquaControl.API",
+  "Mode": "Default",
+  "ManifestType": "Build",
+  "ReferencedProjectsConfiguration": [],
+  "DiscoveryPatterns": [],
+  "Assets": []
+}

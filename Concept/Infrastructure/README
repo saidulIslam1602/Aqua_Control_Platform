@@ -54,7 +54,24 @@ This directory contains theoretical explanations of Infrastructure layer concept
 
 **Key Takeaway**: Repository pattern provides abstraction for data access, separating business logic from database concerns.
 
-### 4. AWSDevOps
+### 4. TimescaleDB
+**Focus**: TimescaleDB implementation for time-series data storage
+
+**Topics Covered**:
+- What is TimescaleDB
+- TimeSeriesDbContext setup
+- Hypertables configuration
+- Compression and retention policies
+- Time-series entity models (SensorReading, Alert)
+- Database initialization
+- Integration with Entity Framework Core
+- Performance optimization for time-series queries
+
+**Key Takeaway**: TimescaleDB provides optimized storage for time-series data with automatic partitioning, compression, and retention policies, enabling efficient analytics and historical data queries.
+
+---
+
+### 5. AWSDevOps
 **Focus**: AWS infrastructure deployment and DevOps practices
 
 **Topics Covered**:
@@ -75,18 +92,42 @@ This directory contains theoretical explanations of Infrastructure layer concept
 
 ---
 
+### 6. DockerCompose
+**Focus**: Local development environment setup with Docker Compose
+
+**Topics Covered**:
+- Multi-container application orchestration
+- Service definitions and dependencies
+- Development Dockerfiles with hot reload
+- Database initialization scripts
+- Nginx reverse proxy configuration
+- Development tools (pgAdmin, Kafka UI, Redis Commander)
+- Monitoring services (Prometheus, Grafana)
+- Volume management and data persistence
+- Health checks and service dependencies
+- Development workflow and scripts
+- Troubleshooting common issues
+
+**Key Takeaway**: Docker Compose provides a complete, production-like local development environment with all services, tools, and monitoring capabilities, enabling consistent development across all team members.
+
+---
+
 ## Reading Order
 
 **For Beginners**:
 1. Start with `RepositoryPattern.md` - Understand data access abstraction
 2. Read `EventSourcing.md` - Understand event storage
 3. Read `ReadModels.md` - Understand query optimization
-4. Read `AWSDevOps.md` - Understand cloud infrastructure deployment
+4. Read `TimescaleDB.md` - Understand time-series data storage
+5. Read `DockerCompose.md` - Understand local development environment
+6. Read `AWSDevOps.md` - Understand cloud infrastructure deployment
 
 **For Reference**:
 - Use `RepositoryPattern.md` when implementing repositories
 - Use `EventSourcing.md` when working with event store
 - Use `ReadModels.md` when optimizing queries
+- Use `TimescaleDB.md` when working with time-series data
+- Use `DockerCompose.md` when setting up local development environment
 - Use `AWSDevOps.md` when deploying to AWS or managing infrastructure
 
 ---
@@ -111,6 +152,21 @@ This directory contains theoretical explanations of Infrastructure layer concept
 - Implementation in Infrastructure
 - Use Unit of Work for transactions
 
+### TimescaleDB
+- Time-series database extension for PostgreSQL
+- Hypertables for automatic partitioning
+- Compression and retention policies
+- Optimized for time-range queries
+- Separate TimeSeriesDbContext
+
+### Docker Compose
+- Multi-container orchestration
+- Development environment setup
+- Hot reload support
+- Service dependencies
+- Development tools integration
+- Local monitoring setup
+
 ### AWS DevOps
 - Infrastructure as Code (Terraform)
 - Kubernetes orchestration (EKS)
@@ -126,19 +182,21 @@ This directory contains theoretical explanations of Infrastructure layer concept
 - See `Concept/Layers/` for how Infrastructure relates to Domain and Application layers
 - See `Concept/Application/` for Application layer concepts
 - See `Concept/Backend/` for Domain layer concepts
-- See `Concept/DataEngineering/` for data engineering and analytics infrastructure
+- See `Concept/DataEngineering/` for data engineering and analytics infrastructure (includes TimescaleDB concepts for data engineering perspective)
 
 ---
 
 ## Infrastructure Layer Responsibilities
 
 **Infrastructure Layer Provides**:
-- Data persistence (Event Store, Read Models)
+- Data persistence (Event Store, Read Models, Time-Series Database)
 - External service integration (AWS, messaging)
 - Repository implementations
-- Database contexts
+- Database contexts (EventStoreDbContext, ReadModelDbContext, TimeSeriesDbContext)
 - Projection handlers
 - File storage services
+- Time-series data storage (TimescaleDB with hypertables)
+- Local development environment (Docker Compose)
 - Cloud infrastructure deployment (Terraform)
 - Container orchestration (Kubernetes/EKS)
 - Monitoring and observability (CloudWatch, Prometheus, Grafana)

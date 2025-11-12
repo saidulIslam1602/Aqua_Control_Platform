@@ -1,0 +1,412 @@
+# Theoretical Concepts: TimescaleDB Implementation
+
+## 1. What is TimescaleDB in Infrastructure Layer?
+
+**TimescaleDB** is a PostgreSQL extension that adds time-series capabilities to the Infrastructure layer, enabling efficient storage and querying of time-stamped data like sensor readings and alerts.
+
+**Key Principle**: Separate time-series data storage optimized for analytics and historical queries
+
+### Architecture Context
+
+```
+Infrastructure Layer
+├── EventStoreDbContext (Event Sourcing)
+├── ReadModelDbContext (CQRS Read Models)
+└── TimeSeriesDbContext (Time-Series Analytics) ← TimescaleDB
+```
+
+**Why Separate Context?**
+- **EventStoreDbContext**: Stores domain events (event sourcing)
+- **ReadModelDbContext**: Denormalized views for fast queries
+- **TimeSeriesDbContext**: Time-series data optimized for analytics
+
+---
+
+## 2. TimeSeriesDbContext
+
+### Purpose
+
+**TimeSeriesDbContext** is a dedicated Entity Framework Core DbContext for time-series data storage using TimescaleDB.
+
+**Responsibilities**:
+- Manage time-series entities (SensorReading, Alert)
+- Configure TimescaleDB hypertables
+- Optimize for time-range queries
+- Support compression and retention policies
+
+### Structure
+
+```csharp
+public sealed class TimeSeriesDbContext : DbContext
+{
+    public DbSet<SensorReading> SensorReadings { get; set; }
+    public DbSet<Alert> Alerts { get; set; }
+    
+    protected override void OnModelCreating(ModelBuilder modelBuilder)
+    {
+        // Configure entities for TimescaleDB
+        // Set up indexes for time-series queries
+        // Configure hypertables
+    }
+}
+```
+
+---
+
+## 3. Time-Series Entity Models
+
+### SensorReading Entity
+
+**Purpose**: Store sensor readings with timestamps for time-series analysis
+
+**Properties**:
+- `Id`: Unique identifier
+- `SensorId`: Reference to sensor
+- `TankId`: Reference to tank
+- `Timestamp`: Time of reading (partition key for hypertable)
+- `Value`: Reading value
+- `QualityScore`: Data quality metric
+- `Metadata`: Additional data (JSONB)
+- `CreatedAt`: Record creation time
+
+**Characteristics**:
+- Optimized for time-range queries
+- Indexed on timestamp and sensor ID
+- Stored in `timeseries` schema
+- Converted to hypertable for automatic partitioning
+
+### Alert Entity
+
+**Purpose**: Store alerts with timestamps for time-series analysis
+
+**Properties**:
+- `Id`: Unique identifier
+- `TankId`: Reference to tank
+- `SensorId`: Optional reference to sensor
+- `AlertType`: Type of alert
+- `Severity`: Alert severity level
+- `Message`: Alert message
+- `ThresholdValue`: Threshold that triggered alert
+- `ActualValue`: Actual value that triggered alert
+- `IsResolved`: Resolution status
+- `ResolvedAt`: Resolution timestamp
+- `ResolvedBy`: User who resolved alert
+- `Metadata`: Additional data (JSONB)
+- `CreatedAt`: Alert creation time (partition key for hypertable)
+
+**Characteristics**:
+- Optimized for time-range queries
+- Indexed on timestamp and tank ID
+- Stored in `timeseries` schema
+- Converted to hypertable for automatic partitioning
+
+---
+
+## 4. Database Initialization
+
+### DatabaseInitializer
+
+**Purpose**: Initialize TimescaleDB with extensions, schemas, and hypertables
+
+**Process**:
+1. Enable TimescaleDB extension
+2. Create `timeseries` schema
+3. Create hypertables for time-series entities
+4. Add compression policies
+5. Add retention policies
+
+### Hypertable Configuration
+
+**SensorReadings Hypertable**:
+```sql
+SELECT create_hypertable(
+    'timeseries."SensorReadings"', 
+    'Timestamp', 
+    chunk_time_interval => INTERVAL '1 hour',
+    if_not_exists => TRUE
+);
+```
+
+**Alerts Hypertable**:
+```sql
+SELECT create_hypertable(
+    'timeseries."Alerts"', 
+    'CreatedAt', 
+    chunk_time_interval => INTERVAL '1 day',
+    if_not_exists => TRUE
+);
+```
+
+**Benefits**:
+- Automatic time-based partitioning
+- Parallel query execution across chunks
+- Efficient storage and compression
+- Fast time-range queries
+
+---
+
+## 5. Compression Policies
+
+### Purpose
+
+**Compression** reduces storage costs by compressing older data while keeping recent data uncompressed for fast queries.
+
+### Configuration
+
+**SensorReadings Compression**:
+- Compress data older than 7 days
+- Reduces storage by ~90%
+- Maintains query performance for recent data
+
+**Alerts Compression**:
+- Compress data older than 30 days
+- Alerts are less frequently queried
+- Longer compression window acceptable
+
+### Implementation
+
+```sql
+SELECT add_compression_policy(
+    'timeseries."SensorReadings"', 
+    INTERVAL '7 days', 
+    if_not_exists => TRUE
+);
+```
+
+---
+
+## 6. Retention Policies
+
+### Purpose
+
+**Retention Policies** automatically delete old data to manage storage costs and maintain performance.
+
+### Configuration
+
+**SensorReadings Retention**:
+- Retain data for 1 year
+- Automatically delete older data
+- Prevents unbounded growth
+
+**Benefits**:
+- Automatic storage management
+- Cost savings
+- Maintains query performance
+- Configurable retention periods
+
+### Implementation
+
+```sql
+SELECT add_retention_policy(
+    'timeseries."SensorReadings"', 
+    INTERVAL '1 year', 
+    if_not_exists => TRUE
+);
+```
+
+---
+
+## 7. Indexes for Time-Series Queries
+
+### Optimized Indexes
+
+**SensorReadings Indexes**:
+- `(Timestamp, SensorId)`: Time-range queries by sensor
+- `(TankId, Timestamp)`: Time-range queries by tank
+- `Timestamp`: General time-range queries
+
+**Alerts Indexes**:
+- `(CreatedAt, TankId)`: Time-range queries by tank
+- `IsResolved`: Filter unresolved alerts
+- `Severity`: Filter by severity level
+
+**Benefits**:
+- Fast time-range queries
+- Efficient filtering
+- Optimized for common query patterns
+
+---
+
+## 8. Integration with Application Layer
+
+### Service Registration
+
+```csharp
+services.AddDbContext<TimeSeriesDbContext>(options =>
+{
+    options.UseNpgsql(connectionString, npgsqlOptions =>
+    {
+        npgsqlOptions.EnableRetryOnFailure(
+            maxRetryCount: 3,
+            maxRetryDelay: TimeSpan.FromSeconds(30));
+    });
+});
+```
+
+### Database Initialization
+
+```csharp
+public static async Task InitializeDatabaseAsync(this WebApplication app)
+{
+    // Initialize Event Store
+    await eventStoreContext.Database.EnsureCreatedAsync();
+    
+    // Initialize Read Models
+    await readContext.Database.EnsureCreatedAsync();
+    
+    // Initialize TimescaleDB
+    await DatabaseInitializer.InitializeAsync(serviceProvider);
+}
+```
+
+---
+
+## 9. Query Patterns
+
+### Time-Range Queries
+
+**Get Sensor Readings for Last 24 Hours**:
+```csharp
+var readings = await context.SensorReadings
+    .Where(sr => sr.Timestamp >= DateTime.UtcNow.AddHours(-24))
+    .Where(sr => sr.SensorId == sensorId)
+    .OrderBy(sr => sr.Timestamp)
+    .ToListAsync();
+```
+
+**Get Alerts for Last Week**:
+```csharp
+var alerts = await context.Alerts
+    .Where(a => a.CreatedAt >= DateTime.UtcNow.AddDays(-7))
+    .Where(a => a.TankId == tankId)
+    .Where(a => !a.IsResolved)
+    .OrderByDescending(a => a.CreatedAt)
+    .ToListAsync();
+```
+
+### Aggregations
+
+**Average Value Over Time**:
+```csharp
+var average = await context.SensorReadings
+    .Where(sr => sr.Timestamp >= startTime && sr.Timestamp <= endTime)
+    .Where(sr => sr.SensorId == sensorId)
+    .AverageAsync(sr => sr.Value);
+```
+
+---
+
+## 10. Best Practices
+
+### ✅ Do
+
+1. **Use TimeSeriesDbContext for Time-Series Data**: Separate from read models
+2. **Configure Hypertables**: Enable automatic partitioning
+3. **Set Compression Policies**: Reduce storage costs
+4. **Set Retention Policies**: Manage data lifecycle
+5. **Index on Time Columns**: Optimize time-range queries
+6. **Use Time Filters**: Always filter by time range
+7. **Batch Inserts**: Insert multiple readings in batches
+
+### ❌ Don't
+
+1. **Don't Store Non-Time-Series Data**: Use ReadModelDbContext instead
+2. **Don't Skip Compression**: Enable for cost savings
+3. **Don't Query Without Time Filters**: Always include time range
+4. **Don't Ignore Retention**: Set retention policies
+5. **Don't Over-Index**: Only index what you query
+
+---
+
+## 11. Relationship with Other Contexts
+
+### Three-Database Architecture
+
+**EventStoreDbContext**:
+- Purpose: Event sourcing storage
+- Schema: `EventStore`
+- Data: Domain events
+- Pattern: Append-only events
+
+**ReadModelDbContext**:
+- Purpose: Fast queries
+- Schema: `ReadModel`
+- Data: Denormalized views
+- Pattern: CQRS read models
+
+**TimeSeriesDbContext**:
+- Purpose: Time-series analytics
+- Schema: `timeseries`
+- Data: Time-stamped measurements
+- Pattern: Hypertables with compression
+
+### Data Flow
+
+```
+Domain Events → EventStoreDbContext
+     ↓
+Projections → ReadModelDbContext (current state)
+     ↓
+Time-Series Data → TimeSeriesDbContext (historical analytics)
+```
+
+---
+
+## 12. Performance Considerations
+
+### Chunk Size
+
+**SensorReadings**: 1-hour chunks
+- Balance between query performance and chunk count
+- Suitable for high-frequency readings
+
+**Alerts**: 1-day chunks
+- Alerts are less frequent
+- Larger chunks acceptable
+
+### Compression
+
+**Benefits**:
+- 90% storage reduction
+- Faster queries on compressed chunks
+- Automatic compression
+
+**Trade-offs**:
+- Slightly slower queries on compressed data
+- Compression overhead during compression
+
+### Retention
+
+**Benefits**:
+- Automatic cleanup
+- Cost savings
+- Maintains performance
+
+**Considerations**:
+- Data permanently deleted after retention period
+- Adjust retention based on business requirements
+
+---
+
+## 13. Summary
+
+**TimescaleDB Implementation**:
+
+**Key Components**:
+- **TimeSeriesDbContext**: Dedicated DbContext for time-series data
+- **SensorReading Entity**: Time-stamped sensor readings
+- **Alert Entity**: Time-stamped alerts
+- **DatabaseInitializer**: TimescaleDB setup and configuration
+- **Hypertables**: Automatic time-based partitioning
+- **Compression Policies**: Automatic compression for old data
+- **Retention Policies**: Automatic data cleanup
+
+**Benefits**:
+- Optimized for time-series queries
+- Automatic partitioning and compression
+- Efficient storage management
+- Separate from event store and read models
+- PostgreSQL compatibility
+
+**Key Takeaway**: TimescaleDB provides a dedicated time-series database context optimized for storing and querying time-stamped data. It complements the Event Store (event sourcing) and Read Models (CQRS) by providing specialized storage for analytics and historical queries. The three-database architecture (Event Store, Read Models, Time-Series) provides optimal performance for different use cases while maintaining clear separation of concerns.
+

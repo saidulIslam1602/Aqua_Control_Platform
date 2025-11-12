@@ -1,0 +1,2 @@
+import{_ as s}from"./index-BgEO1XDn.js";import{z as o,A as n,B as e}from"./vue-vendor-DU8T2215.js";import"./ui-vendor-BVGsLsDI.js";import"./utils-vendor-8BWg7NFy.js";const i={},r={class:"settings-view"};function c(a,t){return n(),o("div",r,[...t[0]||(t[0]=[e("h1",null,"Settings",-1),e("p",null,"Settings view coming soon...",-1)])])}const p=s(i,[["render",c],["__scopeId","data-v-d74319bb"]]);export{p as default};
+//# sourceMappingURL=SettingsView-95RofARn.js.map

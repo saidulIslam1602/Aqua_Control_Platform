@@ -94,7 +94,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/authStore'
 import { useRealTimeStore } from '@/stores/realTimeStore'
 import {
-  Water, Odometer, Box, Cpu, DataAnalysis, Setting,
+  Histogram as Water, Odometer, Box, Cpu, DataAnalysis, Setting,
   UserFilled, User, SwitchButton, Fold, Expand
 } from '@element-plus/icons-vue'
 

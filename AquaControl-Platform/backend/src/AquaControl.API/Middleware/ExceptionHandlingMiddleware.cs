@@ -35,24 +35,24 @@ public class ExceptionHandlingMiddleware
         var (statusCode, error) = exception switch
         {
             ArgumentException => (HttpStatusCode.BadRequest, 
-                Error.Validation("Validation.Failed", exception.Message)),
+                AquaControl.Application.Common.Models.Error.Validation("Validation.Failed", exception.Message)),
             UnauthorizedAccessException => (HttpStatusCode.Unauthorized, 
-                Error.Unauthorized("Auth.Unauthorized", "Unauthorized access")),
+                AquaControl.Application.Common.Models.Error.Unauthorized("Auth.Unauthorized", "Unauthorized access")),
             KeyNotFoundException => (HttpStatusCode.NotFound, 
-                Error.NotFound("Resource.NotFound", "The requested resource was not found")),
+                AquaControl.Application.Common.Models.Error.NotFound("Resource.NotFound", "The requested resource was not found")),
             InvalidOperationException => (HttpStatusCode.Conflict, 
-                Error.Conflict("Operation.Invalid", exception.Message)),
+                AquaControl.Application.Common.Models.Error.Conflict("Operation.Invalid", exception.Message)),
             _ => (HttpStatusCode.InternalServerError, 
-                Error.Failure("Server.InternalError", "An internal server error occurred"))
+                AquaControl.Application.Common.Models.Error.Failure("Server.InternalError", "An internal server error occurred"))
         };
 
         context.Response.StatusCode = (int)statusCode;
 
         var response = new
         {
-            error.Code,
-            error.Description,
-            error.Type,
+            Code = error.Code,
+            Description = error.Description,
+            Type = error.Type,
             Timestamp = DateTime.UtcNow,
             Path = context.Request.Path.Value
         };

@@ -1,0 +1,406 @@
+# Docker Compose - Development Environment Setup
+
+## 1. What is Docker Compose?
+
+**Docker Compose** is a tool for defining and running multi-container Docker applications. It allows you to define all services, networks, volumes, and configurations in a single YAML file and start them with a single command.
+
+**Key Components**:
+- **Service Definitions** - Each service (backend, frontend, database, etc.) is defined as a container
+- **Networking** - Services communicate through a custom Docker network
+- **Volumes** - Persistent data storage for databases and file systems
+- **Environment Variables** - Configuration management per service
+- **Health Checks** - Automatic service health monitoring
+- **Dependencies** - Service startup order management
+
+---
+
+## 2. Why Docker Compose?
+
+### Benefits
+
+**1. Local Development Environment**:
+- Consistent environment across all developers
+- No need to install databases, message queues, or other services locally
+- Quick setup with a single command
+- Easy teardown and cleanup
+
+**2. Service Orchestration**:
+- All services start together
+- Automatic dependency resolution
+- Health checks ensure services are ready
+- Service discovery through Docker networking
+
+**3. Development Tools**:
+- Database administration (pgAdmin)
+- Message queue management (Kafka UI)
+- Cache management (Redis Commander)
+- Monitoring dashboards (Prometheus, Grafana)
+
+**4. Hot Reload Support**:
+- Backend code changes trigger automatic rebuilds
+- Frontend code changes trigger automatic refresh
+- No manual restart required
+
+**5. Production-Like Environment**:
+- Same services as production (scaled down)
+- Same networking configuration
+- Same database setup
+- Same monitoring tools
+
+---
+
+## 3. Docker Compose Architecture
+
+### Service Structure
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    Docker Compose Network                   │
+│                                                             │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐      │
+│  │   Frontend   │  │   Backend   │  │    Nginx    │      │
+│  │   (Vue.js)   │  │  (ASP.NET)  │  │  (Reverse   │      │
+│  │   Port 5173  │  │  Port 5000  │  │   Proxy)    │      │
+│  └──────────────┘  └──────────────┘  │  Port 80    │      │
+│                                        └──────────────┘      │
+│                                                             │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐      │
+│  │ TimescaleDB  │  │    Redis     │  │   Kafka     │      │
+│  │  Port 5432   │  │  Port 6379   │  │  Port 9092  │      │
+│  └──────────────┘  └──────────────┘  └──────────────┘      │
+│                                                             │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐      │
+│  │   pgAdmin    │  │   Prometheus │  │   Grafana   │      │
+│  │  Port 8080   │  │  Port 9090   │  │  Port 3000  │      │
+│  └──────────────┘  └──────────────┘  └──────────────┘      │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### Service Categories
+
+**Application Services**:
+- `backend` - ASP.NET Core API with hot reload
+- `frontend` - Vue.js 3 application with Vite hot reload
+- `nginx` - Reverse proxy and load balancer
+
+**Database Services**:
+- `timescaledb` - PostgreSQL with TimescaleDB extension
+- `redis` - In-memory cache and session store
+
+**Message Queue Services**:
+- `zookeeper` - Coordination service for Kafka
+- `kafka` - Event streaming platform
+
+**Development Tools**:
+- `pgadmin` - PostgreSQL administration interface
+- `kafka-ui` - Kafka management and monitoring UI
+- `redis-commander` - Redis management interface
+
+**Monitoring Services**:
+- `prometheus` - Metrics collection and storage
+- `grafana` - Metrics visualization and dashboards
+
+---
+
+## 4. Docker Compose Configuration
+
+### Main Configuration File
+
+**File**: `docker-compose.yml`
+
+```yaml
+version: '3.8'
+
+services:
+  # Backend API
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.dev
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ConnectionStrings__DefaultConnection=Host=timescaledb;...
+    volumes:
+      - ./backend/src:/app/src
+    depends_on:
+      timescaledb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - aquacontrol-network
+
+  # Frontend Application
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+    volumes:
+      - ./frontend/src:/app/src
+    networks:
+      - aquacontrol-network
+
+  # TimescaleDB
+  timescaledb:
+    image: timescale/timescaledb:latest-pg15
+    volumes:
+      - timescale_data:/var/lib/postgresql/data
+      - ./docker/scripts/init-timescale.sql:/docker-entrypoint-initdb.d/01-init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U aquacontrol"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+```
+
+### Key Configuration Elements
+
+**1. Service Definitions**:
+- Each service has its own configuration
+- Build context and Dockerfile specified
+- Environment variables for configuration
+- Volume mounts for code hot reload
+- Health checks for dependency management
+
+**2. Networking**:
+- Custom bridge network (`aquacontrol-network`)
+- Services communicate by service name
+- Isolated from host network
+
+**3. Volumes**:
+- Named volumes for persistent data
+- Bind mounts for code hot reload
+- Configuration file mounts
+
+**4. Health Checks**:
+- Ensures services are ready before dependent services start
+- Prevents connection errors during startup
+- Automatic retry logic
+
+---
+
+## 5. Development Workflow
+
+### Starting Services
+
+```bash
+# Start all services
+docker-compose up -d
+
+# Start specific services
+docker-compose up -d timescaledb redis
+
+# View logs
+docker-compose logs -f backend frontend
+```
+
+### Development Scripts
+
+**Setup Script** (`scripts/dev-setup.sh`):
+- Checks Docker installation
+- Creates necessary directories
+- Pulls Docker images
+- Builds application images
+- Starts services in order
+- Performs health checks
+- Displays service URLs
+
+**Teardown Script** (`scripts/dev-teardown.sh`):
+- Stops all services
+- Removes containers
+- Optionally removes volumes
+- Cleans up networks and images
+
+### Hot Reload
+
+**Backend Hot Reload**:
+- Uses `dotnet watch run` in Dockerfile.dev
+- Automatically rebuilds on code changes
+- Preserves application state
+
+**Frontend Hot Reload**:
+- Uses `npm run dev` with Vite
+- Instant browser refresh on changes
+- Preserves component state
+
+---
+
+## 6. Database Initialization
+
+### TimescaleDB Setup
+
+**Initialization Script** (`docker/scripts/init-timescale.sql`):
+- Enables TimescaleDB extension
+- Creates schemas (aquacontrol, timeseries, analytics)
+- Creates database roles
+- Grants permissions
+- Creates monitoring functions
+- Configures logging
+
+**Hypertable Creation** (`docker/scripts/create-hypertables.sql`):
+- Creates helper functions for hypertable management
+- Sets up hypertables for time-series tables
+- Configures compression policies
+- Configures retention policies
+
+### Automatic Execution
+
+- Scripts are mounted to `/docker-entrypoint-initdb.d/`
+- Executed automatically on first container start
+- Only runs if database is empty
+- Idempotent (safe to run multiple times)
+
+---
+
+## 7. Nginx Configuration
+
+### Reverse Proxy Setup
+
+**Main Config** (`docker/configs/nginx/nginx.conf`):
+- Worker process configuration
+- Logging format
+- Gzip compression
+- Rate limiting zones
+- Upstream server definitions
+
+**Server Config** (`docker/configs/nginx/default.conf`):
+- Frontend routing
+- Backend API routing
+- GraphQL endpoint routing
+- SignalR WebSocket routing
+- Health check endpoints
+- Static file caching
+
+### Benefits
+
+- Single entry point (port 80)
+- Load balancing between instances
+- SSL termination (when configured)
+- Request rate limiting
+- Security headers
+- Static file serving
+
+---
+
+## 8. Monitoring Integration
+
+### Prometheus Configuration
+
+**Scrape Configuration** (`docker/configs/prometheus/prometheus.yml`):
+- Backend API metrics endpoint
+- Node exporter metrics
+- Redis exporter metrics
+- PostgreSQL exporter metrics
+- Kafka exporter metrics
+
+### Grafana Dashboards
+
+- Pre-configured dashboards for application metrics
+- Database performance monitoring
+- System resource monitoring
+- Custom business metrics
+
+---
+
+## 9. Best Practices
+
+### Development Environment
+
+**1. Use Development Dockerfiles**:
+- Separate Dockerfile.dev for development
+- Include development tools
+- Enable hot reload
+- Mount source code as volumes
+
+**2. Environment Variables**:
+- Use .env files for local configuration
+- Never commit secrets
+- Use different configs per environment
+
+**3. Volume Management**:
+- Use named volumes for databases
+- Use bind mounts for code
+- Clean up volumes when needed
+
+**4. Health Checks**:
+- Always define health checks
+- Use appropriate intervals
+- Set reasonable timeouts
+- Handle startup periods
+
+**5. Service Dependencies**:
+- Use `depends_on` with health checks
+- Start infrastructure services first
+- Start application services last
+
+---
+
+## 10. Troubleshooting
+
+### Common Issues
+
+**1. Port Conflicts**:
+- Check if ports are already in use
+- Change port mappings if needed
+- Use `netstat` to find conflicts
+
+**2. Service Not Starting**:
+- Check logs: `docker-compose logs [service]`
+- Verify health checks
+- Check dependencies
+- Verify environment variables
+
+**3. Database Connection Issues**:
+- Ensure database is healthy
+- Check connection strings
+- Verify network connectivity
+- Check firewall rules
+
+**4. Hot Reload Not Working**:
+- Verify volume mounts
+- Check file permissions
+- Ensure watch mode is enabled
+- Check Docker logs
+
+---
+
+## 11. Production Considerations
+
+### Differences from Development
+
+**1. No Hot Reload**:
+- Use production Dockerfiles
+- Build optimized images
+- No source code mounts
+
+**2. Security**:
+- Use secrets management
+- Enable SSL/TLS
+- Restrict network access
+- Use read-only file systems
+
+**3. Resource Limits**:
+- Set CPU and memory limits
+- Configure restart policies
+- Use resource reservations
+
+**4. Monitoring**:
+- Enable comprehensive logging
+- Set up alerting
+- Monitor resource usage
+- Track performance metrics
+
+---
+
+## 12. Summary
+
+**Docker Compose Provides**:
+- Complete local development environment
+- Service orchestration and dependency management
+- Hot reload support for rapid development
+- Development tools (pgAdmin, Kafka UI, etc.)
+- Monitoring and observability tools
+- Production-like environment locally
+
+**Key Takeaway**: Docker Compose enables developers to run the entire AquaControl platform locally with a single command, providing a consistent, production-like environment with all necessary services, tools, and monitoring capabilities.
+

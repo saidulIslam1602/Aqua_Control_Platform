@@ -1,0 +1,2 @@
+import{_ as o}from"./index-BgEO1XDn.js";import{z as r,A as n,B as s}from"./vue-vendor-DU8T2215.js";import"./ui-vendor-BVGsLsDI.js";import"./utils-vendor-8BWg7NFy.js";const t={},a={class:"sensors-view"};function c(i,e){return n(),r("div",a,[...e[0]||(e[0]=[s("h1",null,"Sensors",-1),s("p",null,"Sensors view coming soon...",-1)])])}const d=o(t,[["render",c],["__scopeId","data-v-6ae554f6"]]);export{d as default};
+//# sourceMappingURL=SensorsView-BdmFaUc-.js.map

@@ -1,8 +1,8 @@
 import { ref, watch } from 'vue'
 
 export function useDebouncedRef<T>(initialValue: T, delay: number = 300) {
-  const debouncedValue = ref<T>(initialValue) as { value: T }
-  const immediateValue = ref<T>(initialValue) as { value: T }
+  const debouncedValue = ref<T>(initialValue)
+  const immediateValue = ref<T>(initialValue)
   
   let timeoutId: ReturnType<typeof setTimeout> | null = null
 

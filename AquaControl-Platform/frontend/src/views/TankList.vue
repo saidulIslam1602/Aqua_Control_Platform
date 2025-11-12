@@ -33,7 +33,7 @@
 import { onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useTankStore } from '@stores/tankStore'
-import type { Tank } from '@types/domain'
+import type { Tank } from '@/types/domain'
 
 const router = useRouter()
 const tankStore = useTankStore()

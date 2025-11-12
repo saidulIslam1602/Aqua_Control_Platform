@@ -1,0 +1,16 @@
+/home/saidul/Desktop/AquaCulturePlatform/AquaControl-Platform/backend/src/AquaControl.Application/obj/Debug/net8.0/AquaControl.Application.csproj.AssemblyReference.cache
+/home/saidul/Desktop/AquaCulturePlatform/AquaControl-Platform/backend/src/AquaControl.Application/obj/Debug/net8.0/AquaControl.Application.GeneratedMSBuildEditorConfig.editorconfig
+/home/saidul/Desktop/AquaCulturePlatform/AquaControl-Platform/backend/src/AquaControl.Application/obj/Debug/net8.0/AquaControl.Application.AssemblyInfoInputs.cache
+/home/saidul/Desktop/AquaCulturePlatform/AquaControl-Platform/backend/src/AquaControl.Application/obj/Debug/net8.0/AquaControl.Application.AssemblyInfo.cs
+/home/saidul/Desktop/AquaCulturePlatform/AquaControl-Platform/backend/src/AquaControl.Application/obj/Debug/net8.0/AquaControl.Application.csproj.CoreCompileInputs.cache
+/home/saidul/Desktop/AquaCulturePlatform/AquaControl-Platform/backend/src/AquaControl.Application/obj/Debug/net8.0/AquaControl.Application.sourcelink.json
+/home/saidul/Desktop/AquaCulturePlatform/AquaControl-Platform/backend/src/AquaControl.Application/bin/Debug/net8.0/AquaControl.Application.deps.json
+/home/saidul/Desktop/AquaCulturePlatform/AquaControl-Platform/backend/src/AquaControl.Application/bin/Debug/net8.0/AquaControl.Application.dll
+/home/saidul/Desktop/AquaCulturePlatform/AquaControl-Platform/backend/src/AquaControl.Application/bin/Debug/net8.0/AquaControl.Application.pdb
+/home/saidul/Desktop/AquaCulturePlatform/AquaControl-Platform/backend/src/AquaControl.Application/bin/Debug/net8.0/AquaControl.Domain.dll
+/home/saidul/Desktop/AquaCulturePlatform/AquaControl-Platform/backend/src/AquaControl.Application/bin/Debug/net8.0/AquaControl.Domain.pdb
+/home/saidul/Desktop/AquaCulturePlatform/AquaControl-Platform/backend/src/AquaControl.Application/obj/Debug/net8.0/AquaCont.4D4CE323.Up2Date
+/home/saidul/Desktop/AquaCulturePlatform/AquaControl-Platform/backend/src/AquaControl.Application/obj/Debug/net8.0/AquaControl.Application.dll
+/home/saidul/Desktop/AquaCulturePlatform/AquaControl-Platform/backend/src/AquaControl.Application/obj/Debug/net8.0/refint/AquaControl.Application.dll
+/home/saidul/Desktop/AquaCulturePlatform/AquaControl-Platform/backend/src/AquaControl.Application/obj/Debug/net8.0/AquaControl.Application.pdb
+/home/saidul/Desktop/AquaCulturePlatform/AquaControl-Platform/backend/src/AquaControl.Application/obj/Debug/net8.0/ref/AquaControl.Application.dll

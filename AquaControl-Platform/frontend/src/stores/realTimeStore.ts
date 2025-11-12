@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import * as signalR from '@microsoft/signalr'
-import type { RealTimeEvent } from '@types/api'
+import type { RealTimeEvent } from '@/types/api'
 
 type EventHandler = (event: RealTimeEvent) => void
 

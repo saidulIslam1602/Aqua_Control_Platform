@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using AquaControl.Application.Common.Interfaces;
 using AquaControl.Domain.Aggregates.TankAggregate;
 using AquaControl.Domain.Common;
@@ -118,22 +119,22 @@ public sealed class TankRepository : ITankRepository
 
     public async Task AddAsync(Tank tank, CancellationToken cancellationToken = default)
     {
-        _logger.LogDebug("Adding tank aggregate {TankId}", tank.Id.Value);
+        _logger.LogDebug("Adding tank aggregate {TankId}", tank.Id);
 
         var events = tank.DomainEvents;
-        await _eventStore.SaveEventsAsync<Tank>(tank.Id.Value, events, 0, cancellationToken);
+        await _eventStore.SaveEventsAsync<Tank>(tank.Id, events, 0, cancellationToken);
         
         tank.ClearDomainEvents();
     }
 
     public async Task UpdateAsync(Tank tank, CancellationToken cancellationToken = default)
     {
-        _logger.LogDebug("Updating tank aggregate {TankId}", tank.Id.Value);
+        _logger.LogDebug("Updating tank aggregate {TankId}", tank.Id);
 
         var events = tank.DomainEvents;
         if (!events.Any()) return;
 
-        await _eventStore.SaveEventsAsync<Tank>(tank.Id.Value, events, tank.Version - events.Count, cancellationToken);
+        await _eventStore.SaveEventsAsync<Tank>(tank.Id, events, tank.Version - events.Count, cancellationToken);
         
         tank.ClearDomainEvents();
     }
@@ -151,7 +152,7 @@ public sealed class TankRepository : ITankRepository
         // In production, you'd have a proper event application mechanism
         // For now, we'll just log that we're applying the event
         _logger.LogDebug("Applying event {EventType} to tank {TankId}", 
-            domainEvent.EventType, tank.Id.Value);
+            domainEvent.EventType, tank.Id);
         
         // In a real implementation, you'd have event handlers that apply events to rebuild state
         // This would typically use reflection or a more sophisticated event sourcing framework

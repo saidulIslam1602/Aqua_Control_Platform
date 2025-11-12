@@ -310,7 +310,7 @@ public sealed class Sensor : Entity<SensorId>
     /// </remarks>
     private void SetDefaultRanges()
     {
-        (MinValue, MaxValue) = SensorType switch
+        var ranges = SensorType switch
         {
             SensorType.Temperature => (-10m, 50m), // Celsius
             SensorType.pH => (0m, 14m),
@@ -320,8 +320,13 @@ public sealed class Sensor : Entity<SensorId>
             SensorType.Ammonia => (0m, 10m), // mg/L
             SensorType.Nitrite => (0m, 5m), // mg/L
             SensorType.Nitrate => (0m, 100m), // mg/L
-            _ => (null, null)
+            SensorType.Phosphate => (0m, 10m), // mg/L
+            SensorType.Alkalinity => (0m, 300m), // mg/L CaCO3
+            _ => (0m, 100m)
         };
+        
+        MinValue = ranges.Item1;
+        MaxValue = ranges.Item2;
     }
 
     /// <summary>
@@ -350,3 +355,4 @@ public sealed class Sensor : Entity<SensorId>
             _ => 6
         };
     }
+}

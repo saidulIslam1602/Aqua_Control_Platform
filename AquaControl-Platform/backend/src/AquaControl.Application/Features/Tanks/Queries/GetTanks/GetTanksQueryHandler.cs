@@ -40,7 +40,7 @@ public sealed class GetTanksQueryHandler : IQueryHandler<GetTanksQuery, PagedRes
 
             var tankDtos = tanks.Select(tank => new TankDto
             {
-                Id = tank.Id.Value,
+                Id = tank.Id,
                 Name = tank.Name,
                 Capacity = tank.Capacity.Value,
                 CapacityUnit = tank.Capacity.Unit,

@@ -82,34 +82,3 @@ public static class ServiceCollectionExtensions
     }
 }
 
-public static class WebApplicationExtensions
-{
-    public static async Task InitializeDatabaseAsync(this WebApplication app)
-    {
-        using var scope = app.Services.CreateScope();
-        var readContext = scope.ServiceProvider.GetRequiredService<ReadModelDbContext>();
-        var eventStoreContext = scope.ServiceProvider.GetRequiredService<EventStoreDbContext>();
-        var timeSeriesContext = scope.ServiceProvider.GetRequiredService<TimeSeriesDbContext>();
-        var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
-
-        try
-        {
-            logger.LogInformation("Starting database initialization...");
-
-            // Ensure databases are created
-            await readContext.Database.EnsureCreatedAsync();
-            await eventStoreContext.Database.EnsureCreatedAsync();
-            
-            // Initialize TimescaleDB
-            await DatabaseInitializer.InitializeAsync(scope.ServiceProvider);
-
-            logger.LogInformation("Database initialization completed successfully");
-        }
-        catch (Exception ex)
-        {
-            logger.LogError(ex, "An error occurred while initializing the database");
-            throw;
-        }
-    }
-}
-

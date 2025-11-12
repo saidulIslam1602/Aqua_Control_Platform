@@ -1,5 +1,6 @@
 using MediatR;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using AquaControl.Domain.Events;
 using AquaControl.Infrastructure.ReadModels;
 using AquaControl.Infrastructure.ReadModels.Models;

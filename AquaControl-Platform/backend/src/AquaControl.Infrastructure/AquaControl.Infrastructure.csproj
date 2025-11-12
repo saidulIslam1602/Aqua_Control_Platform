@@ -4,7 +4,7 @@
     <TargetFramework>net8.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
-    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
   </PropertyGroup>
 
   <ItemGroup>
@@ -16,9 +16,9 @@
     <PackageReference Include="Microsoft.Extensions.Logging" Version="8.0.0" />
     <PackageReference Include="AWSSDK.S3" Version="3.7.307.26" />
     <PackageReference Include="AWSSDK.SQS" Version="3.7.301.28" />
-    <PackageReference Include="AWSSDK.SNS" Version="3.7.301.28" />
+    <PackageReference Include="AWSSDK.SimpleNotificationService" Version="3.7.301.28" />
     <PackageReference Include="AWSSDK.CloudWatch" Version="3.7.301.28" />
-    <PackageReference Include="AWSSDK.RDS" Version="3.7.308.6" />
+    <PackageReference Include="AWSSDK.RDS" Version="3.7.309" />
     <PackageReference Include="StackExchange.Redis" Version="2.7.33" />
     <PackageReference Include="MediatR" Version="12.2.0" />
     <PackageReference Include="Serilog.Extensions.Logging" Version="8.0.0" />

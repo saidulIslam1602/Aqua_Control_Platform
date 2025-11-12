@@ -53,9 +53,9 @@ public sealed class CreateTankCommandHandler : ICommandHandler<CreateTankCommand
             await _tankRepository.AddAsync(tank, cancellationToken);
             await _unitOfWork.SaveChangesAsync(cancellationToken);
 
-            _logger.LogInformation("Tank created successfully with ID: {TankId}", tank.Id.Value);
-
-            return Result.Success(tank.Id.Value);
+            _logger.LogInformation("Tank created successfully with ID: {TankId}", tank.Id);
+            
+            return Result.Success(tank.Id);
         }
         catch (ArgumentException ex)
         {

@@ -1,4 +1,5 @@
 using MediatR;
+using AquaControl.Application.Common.Models;
 
 namespace AquaControl.Application.Common.Interfaces;
 

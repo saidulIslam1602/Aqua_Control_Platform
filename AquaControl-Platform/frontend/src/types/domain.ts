@@ -13,6 +13,12 @@ export interface Tank {
   lastMaintenanceDate?: string
   nextMaintenanceDate?: string
   version: number
+  
+  // Computed properties for UI
+  readonly isActive: boolean
+  readonly isMaintenanceDue: boolean
+  readonly sensorCount: number
+  readonly activeSensorCount: number
 }
 
 export interface TankCapacity {

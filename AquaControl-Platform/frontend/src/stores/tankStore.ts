@@ -8,8 +8,9 @@ import type {
   CreateTankCommand, 
   UpdateTankCommand, 
   GetTanksQuery 
-} from '@types/domain'
-import type { OptimisticUpdate, StoreState } from '@types/api'
+} from '@/types/domain'
+import type { OptimisticUpdate, StoreState } from '@/types/api'
+import { TankStatus } from '@/types/domain'
 
 export const useTankStore = defineStore('tanks', () => {
   // State
@@ -191,10 +192,14 @@ export const useTankStore = defineStore('tanks', () => {
         fullAddress: `${command.building}, ${command.room}${command.zone ? `, ${command.zone}` : ''}`
       },
       tankType: command.tankType,
-      status: 'Inactive',
+      status: TankStatus.Inactive,
       sensors: [],
       createdAt: new Date().toISOString(),
-      version: 1
+      version: 1,
+      isActive: false,
+      isMaintenanceDue: false,
+      sensorCount: 0,
+      activeSensorCount: 0
     }
 
     // Add optimistic update

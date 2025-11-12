@@ -21,7 +21,7 @@ namespace AquaControl.Domain.Aggregates.TankAggregate;
 /// and event sourcing capabilities.
 /// </para>
 /// </remarks>
-public sealed class Tank : AggregateRoot<TankId>
+public sealed class Tank : AggregateRoot<Guid>
 {
     /// <summary>
     /// Internal collection of sensors attached to this tank.
@@ -88,7 +88,7 @@ public sealed class Tank : AggregateRoot<TankId>
     /// <param name="capacity">The capacity of the tank.</param>
     /// <param name="location">The physical location of the tank.</param>
     /// <param name="tankType">The type of tank.</param>
-    private Tank(TankId id, string name, TankCapacity capacity, Location location, TankType tankType)
+    private Tank(Guid id, string name, TankCapacity capacity, Location location, TankType tankType)
         : base(id)
     {
         Name = name;
@@ -97,7 +97,7 @@ public sealed class Tank : AggregateRoot<TankId>
         TankType = tankType;
         Status = TankStatus.Inactive;
         
-        Apply(new TankCreatedEvent(Id, name, capacity, location, tankType));
+        Apply(new TankCreatedEvent(TankId.Create(Id), name, capacity, location, tankType));
     }
 
     /// <summary>
@@ -118,7 +118,7 @@ public sealed class Tank : AggregateRoot<TankId>
         if (string.IsNullOrWhiteSpace(name))
             throw new ArgumentException("Tank name cannot be empty", nameof(name));
 
-        var tankId = TankId.Create();
+        var tankId = Guid.NewGuid();
         return new Tank(tankId, name, capacity, location, tankType);
     }
 

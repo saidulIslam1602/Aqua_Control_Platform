@@ -4,8 +4,8 @@ import type {
   CreateTankCommand, 
   UpdateTankCommand, 
   GetTanksQuery 
-} from '@types/domain'
-import type { ApiResponse, PagedResponse } from '@types/api'
+} from '@/types/domain'
+import type { ApiResponse, PagedResponse } from '@/types/api'
 
 export class TankService {
   private readonly baseUrl = '/api/tanks'

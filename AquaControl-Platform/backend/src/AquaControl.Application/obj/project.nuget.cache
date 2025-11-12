@@ -1,0 +1,15 @@
+{
+  "version": 2,
+  "dgSpecHash": "5z0XxdO1DMU=",
+  "success": true,
+  "projectFilePath": "/home/saidul/Desktop/AquaCulturePlatform/AquaControl-Platform/backend/src/AquaControl.Application/AquaControl.Application.csproj",
+  "expectedPackageFiles": [
+    "/home/saidul/.nuget/packages/fluentvalidation/11.9.0/fluentvalidation.11.9.0.nupkg.sha512",
+    "/home/saidul/.nuget/packages/fluentvalidation.dependencyinjectionextensions/11.9.0/fluentvalidation.dependencyinjectionextensions.11.9.0.nupkg.sha512",
+    "/home/saidul/.nuget/packages/mediatr/12.2.0/mediatr.12.2.0.nupkg.sha512",
+    "/home/saidul/.nuget/packages/mediatr.contracts/2.0.1/mediatr.contracts.2.0.1.nupkg.sha512",
+    "/home/saidul/.nuget/packages/microsoft.extensions.dependencyinjection.abstractions/8.0.1/microsoft.extensions.dependencyinjection.abstractions.8.0.1.nupkg.sha512",
+    "/home/saidul/.nuget/packages/microsoft.extensions.logging.abstractions/8.0.1/microsoft.extensions.logging.abstractions.8.0.1.nupkg.sha512"
+  ],
+  "logs": []
+}

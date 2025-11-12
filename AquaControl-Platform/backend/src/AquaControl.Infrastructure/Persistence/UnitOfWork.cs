@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging;
 using AquaControl.Application.Common.Interfaces;
 using AquaControl.Infrastructure.EventStore;
 using AquaControl.Infrastructure.ReadModels;

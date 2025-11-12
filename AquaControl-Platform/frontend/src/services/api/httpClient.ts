@@ -6,7 +6,7 @@ import axios, {
 } from 'axios'
 import { useAuthStore } from '@stores/authStore'
 import { useNotificationStore } from '@stores/notificationStore'
-import type { ApiResponse, ApiError } from '@types/api'
+import type { ApiResponse, ApiError } from '@/types/api'
 
 class HttpClient {
   private client: AxiosInstance
@@ -39,10 +39,15 @@ class HttpClient {
         }
 
         // Add correlation ID for tracing
-        config.headers['X-Correlation-ID'] = crypto.randomUUID()
+        const timestamp = Date.now()
+        const random = Math.random()
+        const randomStr = random.toString(36)
+        const randomPart = randomStr.slice(2, 9)
+        config.headers['X-Correlation-ID'] = 'req-' + timestamp + '-' + randomPart
 
         // Add request timestamp
-        config.metadata = { startTime: Date.now() }
+        const configWithMetadata = config as any
+        configWithMetadata.metadata = { startTime: Date.now() }
 
         console.log(`🚀 API Request: ${config.method?.toUpperCase()} ${config.url}`, {
           headers: config.headers,
@@ -60,7 +65,7 @@ class HttpClient {
     // Response interceptor
     this.client.interceptors.response.use(
       (response: AxiosResponse) => {
-        const duration = Date.now() - (response.config.metadata?.startTime || 0)
+        const duration = Date.now() - ((response.config as any).metadata?.startTime || 0)
         
         console.log(`✅ API Response: ${response.status} ${response.config.url} (${duration}ms)`, {
           data: response.data,
@@ -97,7 +102,7 @@ class HttpClient {
     
     // Try to refresh token
     try {
-      await authStore.refreshToken()
+      await authStore.refreshTokenAction()
     } catch {
       // Refresh failed, logout user
       await authStore.logout()
@@ -118,7 +123,7 @@ class HttpClient {
     })
   }
 
-  private handleServerError(error: any): void {
+  private handleServerError(_error: any): void {
     const notificationStore = useNotificationStore()
     notificationStore.addNotification({
       type: 'error',

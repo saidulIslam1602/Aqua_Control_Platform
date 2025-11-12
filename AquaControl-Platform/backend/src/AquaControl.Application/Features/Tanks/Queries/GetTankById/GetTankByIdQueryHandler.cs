@@ -33,7 +33,7 @@ public sealed class GetTankByIdQueryHandler : IQueryHandler<GetTankByIdQuery, Ta
 
             var tankDto = new TankDto
             {
-                Id = tank.Id.Value,
+                Id = tank.Id,
                 Name = tank.Name,
                 Capacity = tank.Capacity.Value,
                 CapacityUnit = tank.Capacity.Unit,

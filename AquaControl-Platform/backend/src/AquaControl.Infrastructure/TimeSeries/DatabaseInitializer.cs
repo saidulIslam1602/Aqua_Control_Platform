@@ -87,17 +87,15 @@ public static class DatabaseInitializer
             logger.LogInformation("Creating TimescaleDB hypertables...");
 
             // Create hypertable for sensor readings
-            var sensorReadingsTable = "timeseries.\"SensorReadings\"";
-            await context.Database.ExecuteSqlRawAsync($@"
-                SELECT create_hypertable('{sensorReadingsTable}', 'Timestamp', 
+            await context.Database.ExecuteSqlRawAsync(@"
+                SELECT create_hypertable('timeseries.""SensorReadings""', 'Timestamp', 
                     chunk_time_interval => INTERVAL '1 hour',
                     if_not_exists => TRUE);
             ");
 
             // Create hypertable for alerts
-            var alertsTable = "timeseries.\"Alerts\"";
-            await context.Database.ExecuteSqlRawAsync($@"
-                SELECT create_hypertable('{alertsTable}', 'CreatedAt', 
+            await context.Database.ExecuteSqlRawAsync(@"
+                SELECT create_hypertable('timeseries.""Alerts""', 'CreatedAt', 
                     chunk_time_interval => INTERVAL '1 day',
                     if_not_exists => TRUE);
             ");
@@ -116,25 +114,22 @@ public static class DatabaseInitializer
         {
             logger.LogInformation("Adding TimescaleDB policies...");
 
-            var sensorReadingsTable = "timeseries.\"SensorReadings\"";
-            var alertsTable = "timeseries.\"Alerts\"";
-
             // Add compression policy for older data
-            await context.Database.ExecuteSqlRawAsync($@"
-                SELECT add_compression_policy('{sensorReadingsTable}', 
+            await context.Database.ExecuteSqlRawAsync(@"
+                SELECT add_compression_policy('timeseries.""SensorReadings""', 
                     INTERVAL '7 days', 
                     if_not_exists => TRUE);
             ");
 
-            await context.Database.ExecuteSqlRawAsync($@"
-                SELECT add_compression_policy('{alertsTable}', 
+            await context.Database.ExecuteSqlRawAsync(@"
+                SELECT add_compression_policy('timeseries.""Alerts""', 
                     INTERVAL '30 days', 
                     if_not_exists => TRUE);
             ");
 
             // Add retention policy
-            await context.Database.ExecuteSqlRawAsync($@"
-                SELECT add_retention_policy('{sensorReadingsTable}', 
+            await context.Database.ExecuteSqlRawAsync(@"
+                SELECT add_retention_policy('timeseries.""SensorReadings""', 
                     INTERVAL '1 year', 
                     if_not_exists => TRUE);
             ");

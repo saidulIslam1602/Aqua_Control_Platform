@@ -103,6 +103,26 @@ This directory contains theoretical explanations of Application layer concepts, 
 
 ---
 
+### 7. Testing
+**Focus**: Comprehensive testing strategy and implementation
+
+**Topics Covered**:
+- What is testing and why it matters
+- Testing architecture and structure
+- Backend unit tests (Domain, Application, Infrastructure)
+- Frontend unit tests (Components, Stores, Services)
+- Integration tests (API endpoints, Database, SignalR)
+- Performance tests (Load, Stress)
+- End-to-end tests (User workflows)
+- Test execution and CI/CD integration
+- Testing best practices
+- Test data management
+- Code coverage targets
+
+**Key Takeaway**: Comprehensive testing ensures code quality, prevents regressions, provides documentation, and enables safe refactoring through automated test execution and coverage tracking.
+
+---
+
 ## Reading Order
 
 **For Beginners**:
@@ -112,6 +132,7 @@ This directory contains theoretical explanations of Application layer concepts, 
 4. Read `Handlers.md` - Understand how handlers work
 5. Read `ResultPattern.md` - Understand error handling
 6. Read `API.md` - Understand the API/Presentation layer
+7. Read `Testing.md` - Understand testing strategy
 
 **For Reference**:
 - Use `CQRS.md` when designing command/query separation
@@ -120,6 +141,7 @@ This directory contains theoretical explanations of Application layer concepts, 
 - Use `Handlers.md` when implementing use cases
 - Use `ResultPattern.md` when handling errors
 - Use `API.md` when implementing API endpoints
+- Use `Testing.md` when writing and running tests
 
 ---
 
@@ -161,6 +183,13 @@ This directory contains theoretical explanations of Application layer concepts, 
 - Delegates to Application via MediatR
 - Global error handling
 
+### Testing
+- Unit tests for Domain, Application, and Frontend
+- Integration tests for API endpoints
+- Performance and E2E tests
+- Automated test execution
+- Code coverage tracking
+
 ---
 
 ## Related Concepts
@@ -181,6 +210,7 @@ This directory contains theoretical explanations of Application layer concepts, 
 - Input validation
 - Business coordination
 - Interface definitions for Infrastructure
+- Testing infrastructure and test execution
 
 **Application Layer Depends On**:
 - Domain layer (uses domain models and methods)

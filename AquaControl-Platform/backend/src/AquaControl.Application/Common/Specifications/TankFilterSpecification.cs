@@ -1,5 +1,7 @@
 using AquaControl.Domain.Aggregates.TankAggregate;
 using AquaControl.Domain.Enums;
+using AquaControl.Domain.Common;
+using AquaControl.Application.Common.Extensions;
 using System.Linq.Expressions;
 
 namespace AquaControl.Application.Common.Specifications;
