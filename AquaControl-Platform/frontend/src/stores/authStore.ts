@@ -33,11 +33,26 @@ export const useAuthStore = defineStore('auth', () => {
       isLoading.value = true
       error.value = null
 
+      console.log('🔐 Attempting login with credentials:', { username: credentials.username })
+      
       const response = await authService.login(credentials)
+      
+      console.log('✅ Login API response received:', {
+        hasAccessToken: !!response.accessToken,
+        hasRefreshToken: !!response.refreshToken,
+        hasUser: !!response.user,
+        userFirstName: response.user?.firstName
+      })
       
       token.value = response.accessToken
       refreshTokenValue.value = response.refreshToken
       user.value = response.user
+
+      console.log('✅ Auth state updated:', {
+        tokenSet: !!token.value,
+        userSet: !!user.value,
+        isAuthenticated: isAuthenticated.value
+      })
 
       notificationStore.addNotification({
         type: 'success',
@@ -47,7 +62,15 @@ export const useAuthStore = defineStore('auth', () => {
 
       return true
     } catch (err: any) {
-      error.value = (err as any).response?.data?.message || 'Login failed'
+      console.error('❌ Login failed:', err)
+      console.error('❌ Error details:', {
+        status: err.response?.status,
+        statusText: err.response?.statusText,
+        data: err.response?.data,
+        message: err.message
+      })
+      
+      error.value = err.response?.data?.message || err.message || 'Login failed'
       notificationStore.addNotification({
         type: 'error',
         title: 'Login Failed',

@@ -4,20 +4,27 @@ import type { LoginCredentials, LoginResponse, TokenResponse, RefreshTokenReques
 export const authService = {
   async login(credentials: LoginCredentials): Promise<LoginResponse> {
     try {
-      const response = await httpClient.post<LoginResponse>('/api/auth/login', credentials)
-      return response.data
+      console.log('🌐 Making API call to /api/auth/login')
+      const response = await httpClient.postDirect<LoginResponse>('/api/auth/login', credentials)
+      console.log('🌐 API response received:', {
+        hasAccessToken: !!response.accessToken,
+        hasRefreshToken: !!response.refreshToken,
+        hasUser: !!response.user,
+        userFirstName: response.user?.firstName
+      })
+      return response
     } catch (error) {
-      console.error('Login failed:', error)
+      console.error('🌐 API call failed:', error)
       throw error
     }
   },
 
   async refreshToken(refreshToken: string): Promise<TokenResponse> {
     try {
-      const response = await httpClient.post<TokenResponse>('/api/auth/refresh', { 
+      const response = await httpClient.postDirect<TokenResponse>('/api/auth/refresh', { 
         refreshToken 
       } as RefreshTokenRequest)
-      return response.data
+      return response
     } catch (error) {
       console.error('Token refresh failed:', error)
       throw error
@@ -35,7 +42,7 @@ export const authService = {
 
   async validateToken(token: string): Promise<boolean> {
     try {
-      await httpClient.get('/api/auth/validate', {
+      await httpClient.getDirect('/api/auth/validate', {
         headers: {
           Authorization: `Bearer ${token}`
         }
@@ -49,12 +56,12 @@ export const authService = {
 
   async getUserProfile(token: string): Promise<any> {
     try {
-      const response = await httpClient.get('/api/auth/profile', {
+      const response = await httpClient.getDirect('/api/auth/profile', {
         headers: {
           Authorization: `Bearer ${token}`
         }
       })
-      return response.data
+      return response
     } catch (error) {
       console.error('Get user profile failed:', error)
       throw error

@@ -14,11 +14,7 @@ class HttpClient {
   private readonly timeout: number = 30000
 
   constructor() {
-    // In development, use empty string to rely on Vite proxy
-    // In production, use the full API URL
-    this.baseURL = import.meta.env.PROD 
-      ? (import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000')
-      : '' // Use relative URLs in development to leverage Vite proxy
+    this.baseURL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'
     
     this.client = axios.create({
       baseURL: this.baseURL,
@@ -154,6 +150,17 @@ class HttpClient {
 
   async post<T>(url: string, data?: any, config?: AxiosRequestConfig): Promise<ApiResponse<T>> {
     const response = await this.client.post<ApiResponse<T>>(url, data, config)
+    return response.data
+  }
+
+  // Direct response methods (for endpoints that don't use ApiResponse wrapper)
+  async getDirect<T>(url: string, config?: AxiosRequestConfig): Promise<T> {
+    const response = await this.client.get<T>(url, config)
+    return response.data
+  }
+
+  async postDirect<T>(url: string, data?: any, config?: AxiosRequestConfig): Promise<T> {
+    const response = await this.client.post<T>(url, data, config)
     return response.data
   }
 
