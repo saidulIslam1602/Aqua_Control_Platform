@@ -1,0 +1,472 @@
+# Theoretical Concepts: Stream Processing
+
+## 1. What is Stream Processing?
+
+**Stream Processing** is processing **data in motion** (streams) as it arrives, rather than processing **data at rest** (batches).
+
+**Key Principle**: Process events in real-time as they flow through the system
+
+### Batch Processing
+```
+1. Collect data
+2. Wait for batch (e.g., hourly)
+3. Process entire batch
+4. Output results
+```
+- **Latency**: High (hours)
+- **Throughput**: High
+- **Use Case**: Historical analysis
+
+### Stream Processing
+```
+1. Event arrives
+2. Process immediately
+3. Output result
+4. Continue processing
+```
+- **Latency**: Low (milliseconds)
+- **Throughput**: High
+- **Use Case**: Real-time analytics
+
+---
+
+## 2. Why Stream Processing?
+
+### Real-Time Requirements
+
+**Use Cases**:
+- **Real-time Alerts**: Detect anomalies immediately
+- **Live Dashboards**: Show current metrics
+- **Fraud Detection**: Detect fraud in real-time
+- **IoT Monitoring**: Monitor sensors in real-time
+
+**Benefits**:
+- **Low Latency**: Results in milliseconds
+- **Real-time Insights**: Immediate feedback
+- **Event-Driven**: React to events as they happen
+- **Scalable**: Process high-volume streams
+
+---
+
+## 3. Stream Processing Concepts
+
+### Streams
+
+**Stream** = Unbounded sequence of events
+
+**Properties**:
+- **Unbounded**: Never ends (continuous)
+- **Ordered**: Events have order (usually by time)
+- **Immutable**: Events don't change
+- **Distributed**: Can be processed in parallel
+
+### Windows
+
+**Window** = Group of events within a time range
+
+**Types**:
+- **Tumbling Window**: Fixed, non-overlapping (e.g., every 5 minutes)
+- **Sliding Window**: Overlapping (e.g., 5-minute window, 1-minute slide)
+- **Session Window**: Based on activity gaps
+
+**Example**:
+```
+Events: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+
+Tumbling Window (size 3):
+[1, 2, 3] [4, 5, 6] [7, 8, 9] [10]
+
+Sliding Window (size 3, slide 1):
+[1, 2, 3] [2, 3, 4] [3, 4, 5] ...
+```
+
+### State
+
+**State** = Information maintained across events
+
+**Types**:
+- **Keyed State**: State per key (e.g., per sensor)
+- **Global State**: Shared state
+- **Window State**: State within window
+
+**Example**:
+```
+Maintain running average per sensor:
+- Sensor A: [25, 26, 27] → Average: 26
+- Sensor B: [30, 31] → Average: 30.5
+```
+
+---
+
+## 4. Stream Processing Operations
+
+### Transformations
+
+**1. Map**:
+```
+Input:  [1, 2, 3]
+Output: [2, 4, 6]  (multiply by 2)
+```
+
+**2. Filter**:
+```
+Input:  [1, 2, 3, 4, 5]
+Output: [2, 4]  (keep even numbers)
+```
+
+**3. FlatMap**:
+```
+Input:  ["hello world"]
+Output: ["hello", "world"]  (split into words)
+```
+
+### Aggregations
+
+**1. Count**:
+```
+Events: [A, A, B, A, B]
+Result: A=3, B=2
+```
+
+**2. Sum**:
+```
+Events: [10, 20, 30]
+Result: 60
+```
+
+**3. Average**:
+```
+Events: [10, 20, 30]
+Result: 20
+```
+
+**4. Min/Max**:
+```
+Events: [10, 5, 20, 15]
+Min: 5, Max: 20
+```
+
+### Joins
+
+**Stream-Stream Join**:
+```
+Stream A: [sensor1: 25°C]
+Stream B: [sensor1: 80% humidity]
+Join:    [sensor1: 25°C, 80% humidity]
+```
+
+**Stream-Table Join**:
+```
+Stream:  [sensor1: 25°C]
+Table:   [sensor1: "Tank A"]
+Join:    [sensor1: 25°C, "Tank A"]
+```
+
+---
+
+## 5. Kafka Streams
+
+### What is Kafka Streams?
+
+**Kafka Streams** is a library for building **stream processing applications** using Kafka.
+
+**Key Features**:
+- **Real-time Processing**: Process events as they arrive
+- **Stateful Operations**: Maintain state for aggregations
+- **Windowing**: Time-based aggregations
+- **Exactly-Once**: Guaranteed processing semantics
+
+### Kafka Streams Architecture
+
+```
+Kafka Topic (Input)
+    ↓
+Kafka Streams Application
+    ├─> Filter
+    ├─> Transform
+    ├─> Aggregate (with state)
+    ├─> Join
+    └─> Window
+    ↓
+Kafka Topic (Output)
+```
+
+---
+
+## 6. Stream Processing Patterns
+
+### Pattern 1: Real-time Aggregation
+
+**Problem**: Calculate average temperature per sensor every 5 minutes
+
+**Solution**:
+```java
+stream
+    .groupByKey()  // Group by sensor
+    .windowedBy(TimeWindows.of(Duration.ofMinutes(5)))  // 5-min windows
+    .aggregate(
+        () -> new TemperatureAggregation(),  // Initial state
+        (key, reading, agg) -> agg.add(reading)  // Add reading
+    )
+    .toStream()
+    .to("temperature-averages");
+```
+
+### Pattern 2: Anomaly Detection
+
+**Problem**: Detect temperature anomalies in real-time
+
+**Solution**:
+```java
+stream
+    .groupByKey()
+    .aggregate(
+        () -> new SensorState(),  // Maintain sensor state
+        (key, reading, state) -> {
+            if (state.isAnomaly(reading)) {
+                return state.addAnomaly(reading);
+            }
+            return state.update(reading);
+        }
+    )
+    .filter((key, state) -> state.hasAnomalies())
+    .to("anomalies");
+```
+
+### Pattern 3: Enrichment
+
+**Problem**: Enrich sensor readings with tank metadata
+
+**Solution**:
+```java
+KStream<String, SensorReading> readings = ...;
+KTable<String, Tank> tanks = ...;
+
+readings
+    .leftJoin(tanks, 
+        (reading, tank) -> new EnrichedReading(reading, tank))
+    .to("enriched-readings");
+```
+
+---
+
+## 7. State Management
+
+### Why State?
+
+**State** is needed for:
+- **Aggregations**: Running totals, averages
+- **Joins**: Lookup tables
+- **Pattern Detection**: Sequences, windows
+- **Deduplication**: Track seen events
+
+### State Stores
+
+**State Store** = Storage for maintaining state
+
+**Types**:
+- **Key-Value Store**: Simple key-value pairs
+- **Window Store**: State within time windows
+- **Session Store**: State within sessions
+
+**Example**:
+```java
+// Create state store
+builder.addStateStore(
+    Stores.keyValueStoreBuilder(
+        Stores.persistentKeyValueStore("sensor-state"),
+        Serdes.String(),
+        Serdes.String()
+    )
+);
+
+// Use in transformation
+stream.transform(
+    () -> new StatefulTransformer("sensor-state"),
+    "sensor-state"
+);
+```
+
+---
+
+## 8. Windowing
+
+### Window Types
+
+**1. Tumbling Window**:
+```
+Time:  [0-5min] [5-10min] [10-15min] ...
+Events: [1,2,3] [4,5,6]   [7,8,9]   ...
+```
+- Fixed size
+- Non-overlapping
+- Simple aggregation
+
+**2. Sliding Window**:
+```
+Time:  [0-5min] [1-6min] [2-7min] ...
+Events: [1,2,3] [2,3,4]  [3,4,5]  ...
+```
+- Fixed size
+- Overlapping
+- Smooth aggregations
+
+**3. Session Window**:
+```
+Events: [1,2,3] ... [gap] ... [4,5] ... [gap] ... [6]
+Windows: [Window1]           [Window2]        [Window3]
+```
+- Variable size
+- Based on activity gaps
+- User behavior analysis
+
+---
+
+## 9. Exactly-Once Processing
+
+### Processing Semantics
+
+**At-Least-Once**:
+- Events processed one or more times
+- May have duplicates
+- Simpler, faster
+
+**At-Most-Once**:
+- Events processed zero or one time
+- May lose events
+- Fastest
+
+**Exactly-Once**:
+- Events processed exactly once
+- No duplicates, no losses
+- More complex, slower
+
+### How Exactly-Once Works
+
+```
+1. Transactional Producer
+   └─> Send events in transaction
+   
+2. Transactional Consumer
+   └─> Process events
+   └─> Commit offsets in transaction
+   
+3. If failure
+   └─> Rollback transaction
+   └─> Retry processing
+```
+
+---
+
+## 10. Real-World Use Cases
+
+### 1. Real-time Analytics
+
+**Problem**: Calculate metrics in real-time
+
+**Solution**:
+```
+Sensor Events → Stream Processor → Aggregated Metrics → Dashboard
+```
+
+### 2. Anomaly Detection
+
+**Problem**: Detect anomalies immediately
+
+**Solution**:
+```
+Events → Anomaly Detection → Alerts
+```
+
+### 3. Event Enrichment
+
+**Problem**: Enrich events with additional data
+
+**Solution**:
+```
+Events → Join with Reference Data → Enriched Events
+```
+
+### 4. Data Transformation
+
+**Problem**: Transform data format
+
+**Solution**:
+```
+Format A → Transform → Format B
+```
+
+---
+
+## 11. Stream Processing vs Batch Processing
+
+### When to Use Stream Processing
+
+**Use Stream Processing When**:
+- Need real-time results
+- Low latency required
+- Event-driven architecture
+- Continuous processing
+
+**Examples**:
+- Real-time dashboards
+- Fraud detection
+- IoT monitoring
+- Alerting systems
+
+### When to Use Batch Processing
+
+**Use Batch Processing When**:
+- Can tolerate latency
+- Complex transformations
+- Historical analysis
+- Large-scale aggregations
+
+**Examples**:
+- Daily reports
+- Data warehousing
+- ETL pipelines
+- Machine learning training
+
+---
+
+## 12. Best Practices
+
+### ✅ Do
+
+1. **Use Appropriate Windows**: Choose window size based on use case
+2. **Handle Late Events**: Use watermarks and allowed lateness
+3. **Manage State**: Clean up old state
+4. **Monitor Lag**: Track processing lag
+5. **Handle Errors**: Implement error handling and retries
+6. **Test Stateful Logic**: Test stateful operations thoroughly
+
+### ❌ Don't
+
+1. **Don't Use Large Windows**: Balance latency and accuracy
+2. **Don't Ignore Late Events**: Handle out-of-order events
+3. **Don't Skip Monitoring**: Monitor throughput and lag
+4. **Don't Forget State Cleanup**: Clean up old state
+5. **Don't Ignore Backpressure**: Handle high load
+
+---
+
+## 13. Summary
+
+**Stream Processing**:
+
+**Key Concepts**:
+- **Streams**: Unbounded sequences of events
+- **Windows**: Time-based groupings
+- **State**: Information maintained across events
+- **Transformations**: Map, filter, aggregate
+- **Joins**: Combine streams and tables
+
+**Benefits**:
+- Real-time processing
+- Low latency
+- Event-driven
+- Scalable
+
+**Key Takeaway**: Stream processing enables real-time data processing, allowing systems to react to events as they happen. Use stream processing for real-time analytics, anomaly detection, and event-driven architectures. Kafka Streams provides a powerful library for building stream processing applications with stateful operations and exactly-once guarantees.
+

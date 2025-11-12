@@ -1,0 +1,51 @@
+version: '3.8'
+
+services:
+  timescaledb:
+    image: timescale/timescaledb:latest-pg15
+    container_name: aqua-timescaledb
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: aquacontrol_timeseries
+      POSTGRES_USER: aquacontrol
+      POSTGRES_PASSWORD: ${TIMESCALE_PASSWORD:-AquaControl123!}
+      POSTGRES_INITDB_ARGS: "--auth-host=scram-sha-256"
+    volumes:
+      - timescale-data:/var/lib/postgresql/data
+      - ./init-scripts:/docker-entrypoint-initdb.d
+      - ./config/postgresql.conf:/etc/postgresql/postgresql.conf
+    command: postgres -c config_file=/etc/postgresql/postgresql.conf
+    networks:
+      - aqua-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U aquacontrol -d aquacontrol_timeseries"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: aqua-redis
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-AquaControl123!}
+    volumes:
+      - redis-data:/data
+      - ./config/redis.conf:/usr/local/etc/redis/redis.conf
+    networks:
+      - aqua-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+volumes:
+  timescale-data:
+  redis-data:
+
+networks:
+  aqua-network:
+    external: true
+

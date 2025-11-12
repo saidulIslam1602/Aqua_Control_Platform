@@ -1,0 +1,455 @@
+# Theoretical Concepts: ML Feature Engineering
+
+## 1. What is Feature Engineering?
+
+**Feature Engineering** is the process of **creating features** (input variables) from raw data for machine learning models.
+
+**Key Principle**: Transform raw data into features that help models learn patterns
+
+### Raw Data
+```
+Sensor Reading:
+- time: 2024-01-01 10:00:00
+- sensor_id: "123"
+- value: 25.5
+- quality_score: 0.95
+```
+
+### Engineered Features
+```
+Features:
+- hour: 10
+- hour_sin: 0.707
+- hour_cos: 0.707
+- temperature_mean_1H: 25.3
+- temperature_std_1H: 0.2
+- temperature_trend_3H: 0.1
+- is_weekend: false
+- temp_season_factor: 1.0
+- ... (100+ features)
+```
+
+---
+
+## 2. Why Feature Engineering?
+
+### The Importance of Features
+
+**Good Features**:
+- Help models learn patterns
+- Capture domain knowledge
+- Improve model performance
+- Reduce model complexity
+
+**Bad Features**:
+- Confuse models
+- Add noise
+- Reduce performance
+- Increase complexity
+
+**Rule of Thumb**: 
+> "The quality of features is more important than the algorithm"
+
+---
+
+## 3. Types of Features
+
+### 1. Time Features
+
+**Extract time components**:
+- Hour, day of week, month, quarter
+- Cyclical encoding (sin/cos)
+- Business logic (weekend, feeding time)
+
+**Example**:
+```python
+df['hour'] = df['time'].dt.hour
+df['hour_sin'] = np.sin(2 * np.pi * df['hour'] / 24)
+df['hour_cos'] = np.cos(2 * np.pi * df['hour'] / 24)
+df['is_weekend'] = df['day_of_week'].isin([5, 6])
+```
+
+### 2. Statistical Features
+
+**Aggregations over time windows**:
+- Mean, std, min, max
+- Percentiles (25th, 75th)
+- Range, IQR (Interquartile Range)
+
+**Example**:
+```python
+# Rolling window statistics
+df['temp_mean_1H'] = df['temperature'].rolling('1H').mean()
+df['temp_std_1H'] = df['temperature'].rolling('1H').std()
+df['temp_range_1H'] = df['temperature'].rolling('1H').max() - df['temperature'].rolling('1H').min()
+```
+
+### 3. Trend Features
+
+**Rate of change**:
+- First derivative (rate of change)
+- Second derivative (acceleration)
+- Trend direction (increasing/decreasing)
+
+**Example**:
+```python
+df['temp_roc_1h'] = df['temperature'].diff(periods=12)  # 1 hour change
+df['temp_acceleration'] = df['temp_roc_1h'].diff()  # Rate of change of rate of change
+```
+
+### 4. Lag Features
+
+**Historical values**:
+- Previous values (1 hour ago, 2 hours ago)
+- Capture temporal dependencies
+- Help predict future based on past
+
+**Example**:
+```python
+df['temp_lag_1h'] = df['temperature'].shift(12)  # 1 hour ago
+df['temp_lag_3h'] = df['temperature'].shift(36)  # 3 hours ago
+```
+
+### 5. Interaction Features
+
+**Combine multiple features**:
+- Ratios (temperature/oxygen)
+- Products (temperature * pH)
+- Differences (temperature - optimal_temperature)
+
+**Example**:
+```python
+df['temp_oxygen_ratio'] = df['temperature'] / (df['oxygen'] + 1e-6)
+df['temp_deviation'] = abs(df['temperature'] - df['optimal_temperature'])
+```
+
+---
+
+## 4. Feature Engineering Pipeline
+
+### Pipeline Steps
+
+```
+1. Extract Raw Data
+   └─> Query database for sensor readings
+   
+2. Create Time Features
+   └─> Extract hour, day, month, cyclical encoding
+   
+3. Create Sensor Features
+   └─> Statistical aggregations, trends, lags
+   
+4. Create Interaction Features
+   └─> Combine features, ratios, deviations
+   
+5. Handle Missing Values
+   └─> Impute, forward fill, backward fill
+   
+6. Scale/Normalize
+   └─> StandardScaler, RobustScaler, MinMaxScaler
+   
+7. Feature Selection
+   └─> Select important features
+   
+8. Save Features
+   └─> Store for model training
+```
+
+---
+
+## 5. Time-Based Features
+
+### Cyclical Encoding
+
+**Problem**: Hour 23 and hour 0 are close, but numerically far (23 vs 0)
+
+**Solution**: Cyclical encoding (sin/cos)
+
+```python
+# Instead of: hour = 23
+hour_sin = sin(2 * π * 23 / 24) = 0.258
+hour_cos = cos(2 * π * 23 / 24) = -0.966
+
+# Now: hour 23 and hour 0 are close in feature space
+```
+
+**Benefits**:
+- Captures cyclical patterns
+- Preserves relationships
+- Better for models
+
+### Seasonal Features
+
+**Aquaculture Example**:
+```python
+# Season mapping
+df['season'] = df['month'].map({
+    12: 'winter', 1: 'winter', 2: 'winter',
+    3: 'spring', 4: 'spring', 5: 'spring',
+    6: 'summer', 7: 'summer', 8: 'summer',
+    9: 'autumn', 10: 'autumn', 11: 'autumn'
+})
+
+# Temperature season factor
+df['temp_season_factor'] = df['month'].map({
+    12: 0.2, 1: 0.1, 2: 0.3,  # Winter - lower temps
+    6: 1.0, 7: 1.0, 8: 1.0,   # Summer - peak temps
+    ...
+})
+```
+
+---
+
+## 6. Statistical Features
+
+### Rolling Window Statistics
+
+**Time Windows**:
+- 1 hour, 3 hours, 6 hours, 12 hours, 24 hours
+
+**Statistics**:
+- Mean, std, min, max
+- Percentiles (25th, 75th)
+- Range, IQR
+
+**Example**:
+```python
+for window in ['1H', '3H', '6H', '12H', '24H']:
+    rolling = df['temperature'].rolling(window)
+    
+    features[f'temp_mean_{window}'] = rolling.mean()
+    features[f'temp_std_{window}'] = rolling.std()
+    features[f'temp_min_{window}'] = rolling.min()
+    features[f'temp_max_{window}'] = rolling.max()
+    features[f'temp_range_{window}'] = rolling.max() - rolling.min()
+```
+
+### Stability Features
+
+**Coefficient of Variation**:
+```python
+features['temp_cv_1H'] = rolling.std() / rolling.mean()
+# Low CV = stable, High CV = variable
+```
+
+**Trend**:
+```python
+features['temp_trend_3H'] = df['temperature'] - rolling.mean()
+# Positive = above average, Negative = below average
+```
+
+---
+
+## 7. Domain-Specific Features
+
+### Aquaculture-Specific Features
+
+**Temperature Features**:
+```python
+# Temperature shock risk
+features['temp_shock_risk'] = (abs(roc_1h) > 2.0).astype(int)
+
+# Thermal stratification
+features['thermal_stratification'] = (std_3H > 1.5).astype(int)
+```
+
+**pH Features**:
+```python
+# pH stability
+features['ph_stability'] = 1 / (1 + std_6H)
+
+# pH stress indicators
+features['ph_stress_low'] = (ph < 6.5).astype(int)
+features['ph_stress_high'] = (ph > 8.5).astype(int)
+```
+
+**Oxygen Features**:
+```python
+# Oxygen depletion risk
+features['oxygen_depletion_risk'] = (oxygen < 4.0).astype(int)
+features['oxygen_critical'] = (oxygen < 2.0).astype(int)
+
+# Declining trend
+features['oxygen_declining_trend'] = (trend_3H < -0.5).astype(int)
+```
+
+---
+
+## 8. Feature Scaling
+
+### Why Scale Features?
+
+**Problem**: Features have different scales
+- Temperature: 20-30
+- pH: 6-8
+- Oxygen: 0-10
+
+**Solution**: Scale to same range
+
+### Scaling Methods
+
+**1. StandardScaler** (Z-score normalization):
+```python
+scaled = (value - mean) / std
+# Result: Mean = 0, Std = 1
+```
+
+**2. RobustScaler** (Robust to outliers):
+```python
+scaled = (value - median) / IQR
+# Uses median and IQR (less affected by outliers)
+```
+
+**3. MinMaxScaler**:
+```python
+scaled = (value - min) / (max - min)
+# Result: Range 0-1
+```
+
+---
+
+## 9. Handling Missing Values
+
+### Strategies
+
+**1. Forward Fill**:
+```python
+df.fillna(method='ffill')
+# Use previous value
+```
+
+**2. Backward Fill**:
+```python
+df.fillna(method='bfill')
+# Use next value
+```
+
+**3. Interpolation**:
+```python
+df.interpolate()
+# Linear interpolation between values
+```
+
+**4. Imputation**:
+```python
+from sklearn.impute import SimpleImputer
+
+imputer = SimpleImputer(strategy='median')
+df_imputed = imputer.fit_transform(df)
+# Use median, mean, or constant
+```
+
+---
+
+## 10. Feature Caching
+
+### Why Cache Features?
+
+**Problem**: Feature engineering is expensive
+- Complex calculations
+- Database queries
+- Time-consuming
+
+**Solution**: Cache computed features
+
+**Redis Caching**:
+```python
+# Check cache
+cache_key = f"features:{tank_id}:{timestamp}"
+cached = redis_client.get(cache_key)
+
+if cached:
+    return pd.read_json(cached)
+
+# Compute features
+features = engineer_features(...)
+
+# Cache for 1 hour
+redis_client.setex(cache_key, 3600, features.to_json())
+```
+
+**Benefits**:
+- Faster feature retrieval
+- Reduced database load
+- Cost savings
+
+---
+
+## 11. Feature Selection
+
+### Why Select Features?
+
+**Problem**: Too many features
+- Overfitting
+- Slow training
+- Hard to interpret
+
+**Solution**: Select important features
+
+### Selection Methods
+
+**1. Correlation Analysis**:
+```python
+# Remove highly correlated features
+correlation_matrix = features.corr()
+# Remove one of highly correlated pairs
+```
+
+**2. Feature Importance**:
+```python
+# Train model, get feature importance
+model.fit(X, y)
+importance = model.feature_importances_
+# Select top N features
+```
+
+**3. Statistical Tests**:
+```python
+# Chi-square test for categorical
+# F-test for numerical
+# Select features with significant relationships
+```
+
+---
+
+## 12. Best Practices
+
+### ✅ Do
+
+1. **Understand Domain**: Create domain-specific features
+2. **Use Time Windows**: Multiple window sizes
+3. **Handle Missing Values**: Appropriate strategy
+4. **Scale Features**: Normalize for models
+5. **Cache Features**: For performance
+6. **Validate Features**: Check for errors
+
+### ❌ Don't
+
+1. **Don't Create Too Many Features**: Risk of overfitting
+2. **Don't Ignore Domain Knowledge**: Use expert knowledge
+3. **Don't Skip Validation**: Validate feature quality
+4. **Don't Forget Scaling**: Scale before training
+5. **Don't Ignore Missing Values**: Handle appropriately
+
+---
+
+## 13. Summary
+
+**ML Feature Engineering**:
+
+**Key Concepts**:
+- **Time Features**: Cyclical encoding, seasonal features
+- **Statistical Features**: Aggregations, trends, lags
+- **Domain Features**: Domain-specific knowledge
+- **Interaction Features**: Combine features
+- **Scaling**: Normalize features
+- **Caching**: Cache computed features
+
+**Benefits**:
+- Better model performance
+- Captures domain knowledge
+- Improves predictions
+- Enables complex patterns
+
+**Key Takeaway**: Feature engineering is crucial for ML success. Good features capture domain knowledge and help models learn patterns. Use time-based features, statistical aggregations, domain-specific features, and proper scaling. Cache features for performance and validate feature quality.
+

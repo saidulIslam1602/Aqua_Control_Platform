@@ -1,0 +1,403 @@
+# Theoretical Concepts: Time-Series Databases (TimescaleDB)
+
+## 1. What is a Time-Series Database?
+
+**Time-Series Database** is a database optimized for storing and querying **time-stamped data**.
+
+**Key Principle**: Data points indexed by time, enabling fast time-based queries
+
+### Traditional Database (PostgreSQL)
+```
+Table: readings
+- id, sensor_id, value, timestamp
+- Index on id, sensor_id
+- Slow for time-range queries
+```
+
+### Time-Series Database (TimescaleDB)
+```
+Hypertable: readings
+- Automatically partitioned by time
+- Optimized indexes for time queries
+- Fast time-range queries
+```
+
+---
+
+## 2. Why Time-Series Databases?
+
+### Problem with Traditional Databases
+
+**Time-Series Data Characteristics**:
+- **High Volume**: Millions of data points per day
+- **Time-Ordered**: Data arrives in time order
+- **Time-Range Queries**: Most queries are time-based
+- **Append-Heavy**: Mostly inserts, few updates
+
+**Traditional Database Issues**:
+- Slow time-range queries
+- Index bloat over time
+- Poor compression
+- Not optimized for time-series patterns
+
+### Solution: Time-Series Database
+
+**TimescaleDB Benefits**:
+- **Fast Time Queries**: Optimized for time-range queries
+- **Automatic Partitioning**: Chunks data by time
+- **Compression**: Efficient storage
+- **Continuous Aggregates**: Pre-computed aggregations
+- **Retention Policies**: Automatic data retention
+
+---
+
+## 3. What is TimescaleDB?
+
+**TimescaleDB** is a **PostgreSQL extension** that adds time-series capabilities.
+
+**Key Features**:
+- **Hypertables**: Automatically partitioned tables
+- **Chunks**: Time-based partitions
+- **Compression**: Automatic compression
+- **Continuous Aggregates**: Materialized views
+- **Retention Policies**: Automatic data retention
+
+**Advantages**:
+- **PostgreSQL Compatible**: Uses standard SQL
+- **No New Database**: Extension, not separate database
+- **Full SQL**: All PostgreSQL features available
+- **ACID**: Full transaction support
+
+---
+
+## 4. Hypertables
+
+### What are Hypertables?
+
+**Hypertable** = Regular PostgreSQL table converted to time-series table
+
+**How It Works**:
+```
+Regular Table → Convert to Hypertable → Automatic Partitioning
+```
+
+**Benefits**:
+- **Automatic Partitioning**: Data split into chunks by time
+- **Parallel Queries**: Query multiple chunks in parallel
+- **Efficient Storage**: Better compression
+- **Fast Queries**: Optimized for time-range queries
+
+### Creating a Hypertable
+
+```sql
+-- Regular table
+CREATE TABLE sensor_data.readings (
+    time TIMESTAMPTZ NOT NULL,
+    sensor_id UUID NOT NULL,
+    value DOUBLE PRECISION NOT NULL
+);
+
+-- Convert to hypertable
+SELECT create_hypertable(
+    'sensor_data.readings', 
+    'time', 
+    chunk_time_interval => INTERVAL '1 hour'
+);
+```
+
+**Result**:
+- Table automatically partitioned by time
+- Each hour = one chunk
+- Queries automatically use appropriate chunks
+
+---
+
+## 5. Chunks
+
+### What are Chunks?
+
+**Chunk** = Time-based partition of a hypertable
+
+**Properties**:
+- **Time-Based**: Each chunk covers a time range
+- **Automatic**: Created automatically as data arrives
+- **Independent**: Can be queried, compressed, dropped independently
+
+**Example**:
+```
+Hypertable: readings
+├── Chunk 1: 2024-01-01 00:00 - 01:00
+├── Chunk 2: 2024-01-01 01:00 - 02:00
+├── Chunk 3: 2024-01-01 02:00 - 03:00
+└── ...
+```
+
+**Benefits**:
+- **Parallel Queries**: Query multiple chunks simultaneously
+- **Efficient Indexes**: Smaller indexes per chunk
+- **Selective Queries**: Only query relevant chunks
+- **Easy Maintenance**: Drop old chunks easily
+
+---
+
+## 6. Time-Series Queries
+
+### Common Query Patterns
+
+**1. Time-Range Queries**:
+```sql
+SELECT * FROM sensor_data.readings
+WHERE time >= NOW() - INTERVAL '24 hours'
+AND sensor_id = '123'
+ORDER BY time DESC;
+```
+
+**2. Aggregations**:
+```sql
+SELECT 
+    time_bucket('1 hour', time) as hour,
+    sensor_id,
+    AVG(value) as avg_value,
+    MIN(value) as min_value,
+    MAX(value) as max_value
+FROM sensor_data.readings
+WHERE time >= NOW() - INTERVAL '7 days'
+GROUP BY hour, sensor_id
+ORDER BY hour;
+```
+
+**3. Window Functions**:
+```sql
+SELECT 
+    time,
+    value,
+    AVG(value) OVER (
+        PARTITION BY sensor_id 
+        ORDER BY time 
+        ROWS BETWEEN 11 PRECEDING AND CURRENT ROW
+    ) as moving_avg
+FROM sensor_data.readings
+WHERE sensor_id = '123';
+```
+
+---
+
+## 7. Compression
+
+### Automatic Compression
+
+**TimescaleDB** automatically compresses old chunks.
+
+**Benefits**:
+- **Storage Savings**: 90%+ compression
+- **Query Performance**: Faster queries on compressed data
+- **Automatic**: No manual intervention needed
+
+**How It Works**:
+```
+1. Chunk reaches compression threshold (e.g., 7 days old)
+2. TimescaleDB compresses chunk
+3. Data stored more efficiently
+4. Queries automatically decompress when needed
+```
+
+**Compression Policy**:
+```sql
+-- Compress chunks older than 7 days
+SELECT add_compression_policy('sensor_data.readings', INTERVAL '7 days');
+```
+
+---
+
+## 8. Continuous Aggregates
+
+### What are Continuous Aggregates?
+
+**Continuous Aggregates** = Materialized views that automatically update
+
+**Benefits**:
+- **Pre-computed**: Aggregations computed in advance
+- **Automatic Updates**: Refresh automatically
+- **Fast Queries**: Instant results
+- **Incremental**: Only process new data
+
+**Example**:
+```sql
+-- Create continuous aggregate
+CREATE MATERIALIZED VIEW hourly_sensor_stats
+WITH (timescaledb.continuous) AS
+SELECT 
+    time_bucket('1 hour', time) as hour,
+    sensor_id,
+    AVG(value) as avg_value,
+    MIN(value) as min_value,
+    MAX(value) as max_value,
+    COUNT(*) as count
+FROM sensor_data.readings
+GROUP BY hour, sensor_id;
+
+-- Query is instant (pre-computed)
+SELECT * FROM hourly_sensor_stats
+WHERE hour >= NOW() - INTERVAL '24 hours';
+```
+
+---
+
+## 9. Retention Policies
+
+### Automatic Data Retention
+
+**Retention Policy** = Automatically drop old data
+
+**Use Case**: Keep only recent data, drop old data
+
+**Example**:
+```sql
+-- Drop data older than 90 days
+SELECT add_retention_policy('sensor_data.readings', INTERVAL '90 days');
+```
+
+**Benefits**:
+- **Storage Management**: Automatic cleanup
+- **Cost Savings**: Less storage needed
+- **Performance**: Smaller tables = faster queries
+
+---
+
+## 10. Analytics Functions
+
+### Built-in Analytics
+
+**TimescaleDB** provides functions for time-series analytics:
+
+**1. Time Bucketing**:
+```sql
+SELECT time_bucket('1 hour', time) as hour, AVG(value)
+FROM readings
+GROUP BY hour;
+```
+
+**2. Gap Filling**:
+```sql
+SELECT time_bucket_gapfill('1 hour', time) as hour, AVG(value)
+FROM readings
+WHERE time >= NOW() - INTERVAL '24 hours'
+GROUP BY hour;
+```
+
+**3. Percentile**:
+```sql
+SELECT percentile_agg(value) as p95
+FROM readings
+WHERE time >= NOW() - INTERVAL '24 hours';
+```
+
+---
+
+## 11. Real-World Use Cases
+
+### 1. IoT Sensor Data
+
+**Problem**: Store millions of sensor readings per day
+
+**Solution**:
+```
+Sensors → TimescaleDB Hypertable
+- Automatic partitioning
+- Fast time-range queries
+- Compression for old data
+```
+
+### 2. Monitoring and Metrics
+
+**Problem**: Store application metrics, query dashboards
+
+**Solution**:
+```
+Metrics → TimescaleDB → Continuous Aggregates → Dashboards
+```
+
+### 3. Financial Data
+
+**Problem**: Store stock prices, calculate moving averages
+
+**Solution**:
+```
+Prices → TimescaleDB → Window Functions → Analytics
+```
+
+---
+
+## 12. TimescaleDB vs Other Solutions
+
+### TimescaleDB vs InfluxDB
+
+**TimescaleDB**:
+- PostgreSQL extension
+- Full SQL support
+- ACID transactions
+- Better for complex queries
+
+**InfluxDB**:
+- Purpose-built time-series DB
+- InfluxQL/Flux query language
+- Optimized for simple queries
+- Better for high write throughput
+
+### TimescaleDB vs Regular PostgreSQL
+
+**TimescaleDB**:
+- Automatic partitioning
+- Compression
+- Continuous aggregates
+- Time-series optimizations
+
+**Regular PostgreSQL**:
+- Manual partitioning
+- No automatic compression
+- Manual materialized views
+- General-purpose
+
+---
+
+## 13. Best Practices
+
+### ✅ Do
+
+1. **Choose Chunk Interval**: Balance query performance and chunk size
+2. **Use Compression**: Enable compression for old data
+3. **Create Continuous Aggregates**: For common aggregations
+4. **Set Retention Policies**: Manage storage automatically
+5. **Index Appropriately**: Index on time and other query columns
+6. **Use Time Buckets**: For aggregations
+
+### ❌ Don't
+
+1. **Don't Use Small Chunks**: Balance chunk size
+2. **Don't Skip Compression**: Enable for cost savings
+3. **Don't Query All Data**: Use time filters
+4. **Don't Ignore Retention**: Set retention policies
+5. **Don't Over-Index**: Only index what you query
+
+---
+
+## 14. Summary
+
+**Time-Series Databases (TimescaleDB)**:
+
+**Key Concepts**:
+- **Hypertables**: Automatically partitioned tables
+- **Chunks**: Time-based partitions
+- **Compression**: Automatic compression
+- **Continuous Aggregates**: Auto-updating materialized views
+- **Retention Policies**: Automatic data cleanup
+
+**Benefits**:
+- Fast time-range queries
+- Efficient storage
+- Automatic partitioning
+- PostgreSQL compatibility
+- Full SQL support
+
+**Key Takeaway**: TimescaleDB extends PostgreSQL with time-series capabilities, providing automatic partitioning, compression, and continuous aggregates. It's ideal for IoT data, monitoring, and any application with time-stamped data. Use TimescaleDB when you need PostgreSQL compatibility with time-series optimizations.
+

@@ -1,0 +1,161 @@
+# Data Engineering Concept Directory
+
+This directory contains theoretical explanations of Data Engineering concepts, patterns, and technologies used in the AquaCulture Platform.
+
+## Files Overview
+
+### 1. EventStreaming
+**Focus**: Apache Kafka and event streaming
+
+**Topics Covered**:
+- What is event streaming
+- Kafka architecture (topics, partitions, consumers, producers)
+- Consumer groups and load balancing
+- Schema Registry for schema management
+- Kafka Streams for stream processing
+- Real-world use cases
+- Best practices
+
+**Key Takeaway**: Kafka provides a robust, scalable platform for event streaming, enabling real-time data processing and decoupled microservices.
+
+---
+
+### 2. TimeSeriesDatabases
+**Focus**: TimescaleDB and time-series data
+
+**Topics Covered**:
+- What are time-series databases
+- Why time-series databases
+- TimescaleDB hypertables and chunks
+- Compression and retention policies
+- Continuous aggregates
+- Time-series queries
+- Analytics functions
+
+**Key Takeaway**: TimescaleDB extends PostgreSQL with time-series capabilities, providing automatic partitioning, compression, and optimized queries for time-stamped data.
+
+---
+
+### 3. StreamProcessing
+**Focus**: Stream processing patterns and Kafka Streams
+
+**Topics Covered**:
+- What is stream processing
+- Streams, windows, and state
+- Stream processing operations (map, filter, aggregate, join)
+- Kafka Streams architecture
+- State management
+- Windowing strategies
+- Exactly-once processing
+
+**Key Takeaway**: Stream processing enables real-time data processing, allowing systems to react to events as they happen with low latency.
+
+---
+
+### 4. MLFeatureEngineering
+**Focus**: Feature engineering for machine learning
+
+**Topics Covered**:
+- What is feature engineering
+- Types of features (time, statistical, trend, lag, interaction)
+- Feature engineering pipeline
+- Time-based features (cyclical encoding, seasonal)
+- Statistical features (rolling windows, aggregations)
+- Domain-specific features
+- Feature scaling and normalization
+- Feature caching
+
+**Key Takeaway**: Feature engineering transforms raw data into features that help ML models learn patterns. Good features are crucial for model performance.
+
+---
+
+## Reading Order
+
+**For Beginners**:
+1. Start with `EventStreaming.md` - Understand Kafka basics
+2. Read `TimeSeriesDatabases.md` - Learn about time-series data
+3. Read `StreamProcessing.md` - Understand stream processing
+4. Read `MLFeatureEngineering.md` - Learn feature engineering
+
+**For Reference**:
+- Use `EventStreaming.md` when working with Kafka
+- Use `TimeSeriesDatabases.md` when working with TimescaleDB
+- Use `StreamProcessing.md` when building stream processors
+- Use `MLFeatureEngineering.md` when engineering ML features
+
+---
+
+## Quick Reference
+
+### Event Streaming (Kafka)
+- Topics: Categories of events
+- Partitions: Parallel processing units
+- Consumer Groups: Load balancing
+- Schema Registry: Schema management
+
+### Time-Series (TimescaleDB)
+- Hypertables: Automatically partitioned tables
+- Chunks: Time-based partitions
+- Compression: Automatic compression
+- Continuous Aggregates: Auto-updating views
+
+### Stream Processing
+- Streams: Unbounded event sequences
+- Windows: Time-based groupings
+- State: Information across events
+- Transformations: Map, filter, aggregate
+
+### ML Feature Engineering
+- Time Features: Cyclical encoding, seasonal
+- Statistical Features: Aggregations, trends
+- Domain Features: Domain-specific knowledge
+- Scaling: Normalize features
+
+---
+
+## Data Engineering Architecture
+
+### Data Flow
+```
+IoT Sensors → Kafka → Stream Processor → TimescaleDB
+                                    ↓
+                            Feature Engineering
+                                    ↓
+                            ML Models → Predictions
+```
+
+### Components
+- **Kafka**: Event streaming platform
+- **Kafka Streams**: Real-time stream processing
+- **TimescaleDB**: Time-series database
+- **Redis**: Feature caching
+- **ML Pipeline**: Feature engineering and model training
+
+---
+
+## Related Concepts
+
+- See `Concept/Infrastructure/` for backend infrastructure patterns
+- See `Concept/Layers/` for how Data Engineering integrates with other layers
+
+---
+
+## Data Engineering Responsibilities
+
+**Data Engineering Layer Provides**:
+- Real-time event streaming (Kafka)
+- Time-series data storage (TimescaleDB)
+- Stream processing (Kafka Streams)
+- ML feature engineering
+- Analytics functions
+- Data quality monitoring
+
+**Data Engineering Layer Depends On**:
+- Backend Infrastructure (for data ingestion)
+- Domain events (from Domain layer)
+
+**Data Engineering Layer is Used By**:
+- ML models (for features)
+- Analytics dashboards (for metrics)
+- Alerting systems (for real-time alerts)
+
