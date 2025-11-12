@@ -177,6 +177,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useTankStore } from '@/stores/tankStore'
 import { useRealTimeStore } from '@/stores/realTimeStore'
+import { useAlertStore } from '@/stores/alertStore'
 import { 
   Refresh, 
   DataBoard as Database, 
@@ -192,11 +193,11 @@ import type { Tank } from '@/types/domain'
 const router = useRouter()
 const tankStore = useTankStore()
 const realTimeStore = useRealTimeStore()
+const alertStore = useAlertStore()
 
 // Computed properties
 const alertCount = computed(() => {
-  // TODO: Get actual alert count from alert store
-  return Math.floor(Math.random() * 5)
+  return alertStore.alertCount
 })
 
 const systemHealth = computed(() => {
@@ -309,6 +310,7 @@ const formatTime = (timestamp: Date) => {
 // Lifecycle
 onMounted(async () => {
   await refreshData()
+  await alertStore.fetchAlerts()
 })
 </script>
 

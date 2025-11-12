@@ -1,10 +1,8 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.IdentityModel.Tokens;
-using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
-using System.Text;
 using AquaControl.Application.Common.Models;
+using AquaControl.Application.Services;
 
 namespace AquaControl.API.Controllers;
 
@@ -12,12 +10,17 @@ namespace AquaControl.API.Controllers;
 [Route("api/[controller]")]
 public class AuthController : ControllerBase
 {
-    private readonly IConfiguration _configuration;
+    private readonly IAuthenticationService _authenticationService;
+    private readonly ITokenService _tokenService;
     private readonly ILogger<AuthController> _logger;
 
-    public AuthController(IConfiguration configuration, ILogger<AuthController> logger)
+    public AuthController(
+        IAuthenticationService authenticationService,
+        ITokenService tokenService,
+        ILogger<AuthController> logger)
     {
-        _configuration = configuration;
+        _authenticationService = authenticationService;
+        _tokenService = tokenService;
         _logger = logger;
     }
 
@@ -28,48 +31,49 @@ public class AuthController : ControllerBase
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    public Task<ActionResult<LoginResponse>> Login([FromBody] LoginRequest request)
+    public async Task<ActionResult<LoginResponse>> Login([FromBody] LoginRequest request)
     {
         _logger.LogInformation("Login attempt for username: {Username}", request.Username);
 
         try
         {
-            // TODO: Replace with actual user authentication
-            // For now, use demo credentials
-            if (request.Username == "admin" && request.Password == "admin123")
+            var ipAddress = GetIpAddress();
+            var (success, user, error) = await _authenticationService.AuthenticateAsync(request.Username, request.Password);
+
+            if (!success || user == null)
             {
-                var user = new UserDto
-                {
-                    Id = Guid.NewGuid().ToString(),
-                    Username = "admin",
-                    Email = "admin@aquacontrol.com",
-                    FirstName = "Admin",
-                    LastName = "User",
-                    Roles = new[] { "Administrator", "User" },
-                    CreatedAt = DateTime.UtcNow,
-                    LastLoginAt = DateTime.UtcNow
-                };
-
-                var (accessToken, refreshToken) = GenerateTokens(user);
-
-                var response = new LoginResponse(
-                    accessToken,
-                    refreshToken,
-                    user,
-                    DateTime.UtcNow.AddHours(1)
-                );
-
-                _logger.LogInformation("Login successful for username: {Username}", request.Username);
-                return Task.FromResult<ActionResult<LoginResponse>>(Ok(response));
+                _logger.LogWarning("Login failed for username: {Username} - {Error}", request.Username, error);
+                return Unauthorized(new { message = error ?? "Invalid username or password" });
             }
 
-            _logger.LogWarning("Login failed for username: {Username}", request.Username);
-            return Task.FromResult<ActionResult<LoginResponse>>(Unauthorized(new { message = "Invalid username or password" }));
+            var (accessToken, refreshToken) = await _tokenService.GenerateTokensAsync(user, ipAddress);
+
+            var userDto = new UserDto
+            {
+                Id = user.Id.ToString(),
+                Username = user.Username,
+                Email = user.Email,
+                FirstName = user.FirstName,
+                LastName = user.LastName,
+                Roles = user.Roles,
+                CreatedAt = user.CreatedAt,
+                LastLoginAt = user.LastLoginAt
+            };
+
+            var response = new LoginResponse(
+                accessToken,
+                refreshToken,
+                userDto,
+                DateTime.UtcNow.AddHours(1)
+            );
+
+            _logger.LogInformation("Login successful for username: {Username}", request.Username);
+            return Ok(response);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error during login for username: {Username}", request.Username);
-            return Task.FromResult<ActionResult<LoginResponse>>(BadRequest(new { message = "Login failed" }));
+            return BadRequest(new { message = "Login failed" });
         }
     }
 
@@ -79,41 +83,34 @@ public class AuthController : ControllerBase
     [HttpPost("refresh")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
-    public Task<ActionResult<TokenResponse>> RefreshToken([FromBody] RefreshTokenRequest request)
+    public async Task<ActionResult<TokenResponse>> RefreshToken([FromBody] RefreshTokenRequest request)
     {
         _logger.LogInformation("Token refresh attempt");
 
         try
         {
-            // TODO: Implement proper refresh token validation
-            // For now, generate new tokens
-            var user = new UserDto
-            {
-                Id = Guid.NewGuid().ToString(),
-                Username = "admin",
-                Email = "admin@aquacontrol.com",
-                FirstName = "Admin",
-                LastName = "User",
-                Roles = new[] { "Administrator", "User" },
-                CreatedAt = DateTime.UtcNow,
-                LastLoginAt = DateTime.UtcNow
-            };
+            var ipAddress = GetIpAddress();
+            var (success, accessToken, refreshToken, error) = await _tokenService.RefreshTokenAsync(request.RefreshToken, ipAddress);
 
-            var (accessToken, refreshToken) = GenerateTokens(user);
+            if (!success)
+            {
+                _logger.LogWarning("Token refresh failed: {Error}", error);
+                return Unauthorized(new { message = error ?? "Token refresh failed" });
+            }
 
             var response = new TokenResponse(
-                accessToken,
-                refreshToken,
+                accessToken!,
+                refreshToken!,
                 DateTime.UtcNow.AddHours(1)
             );
 
             _logger.LogInformation("Token refresh successful");
-            return Task.FromResult<ActionResult<TokenResponse>>(Ok(response));
+            return Ok(response);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error during token refresh");
-            return Task.FromResult<ActionResult<TokenResponse>>(Unauthorized(new { message = "Token refresh failed" }));
+            return Unauthorized(new { message = "Token refresh failed" });
         }
     }
 
@@ -164,59 +161,53 @@ public class AuthController : ControllerBase
     [HttpPost("logout")]
     [Authorize]
     [ProducesResponseType(StatusCodes.Status200OK)]
-    public ActionResult Logout()
+    public async Task<ActionResult> Logout([FromBody] RefreshTokenRequest? request = null)
     {
         var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
         _logger.LogInformation("Logout for user: {UserId}", userId);
 
-        // TODO: Implement token blacklisting or refresh token revocation
-        return Ok(new { message = "Logged out successfully" });
+        try
+        {
+            var ipAddress = GetIpAddress();
+
+            // Revoke the specific refresh token if provided
+            if (request?.RefreshToken != null)
+            {
+                await _tokenService.RevokeTokenAsync(request.RefreshToken, ipAddress, "User logout");
+            }
+            // If no specific token provided, revoke all user tokens for security
+            else if (Guid.TryParse(userId, out var userGuid))
+            {
+                await _tokenService.RevokeAllUserTokensAsync(userGuid, "User logout - all sessions");
+            }
+
+            _logger.LogInformation("Logout successful for user: {UserId}", userId);
+            return Ok(new { message = "Logged out successfully" });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error during logout for user: {UserId}", userId);
+            // Still return success to avoid revealing internal errors
+            return Ok(new { message = "Logged out successfully" });
+        }
     }
 
-    private (string accessToken, string refreshToken) GenerateTokens(UserDto user)
+    private string GetIpAddress()
     {
-        var jwtSettings = _configuration.GetSection("JwtSettings");
-        var secretKey = jwtSettings["SecretKey"] ?? throw new InvalidOperationException("JWT SecretKey not configured");
-        var issuer = jwtSettings["Issuer"] ?? "AquaControl";
-        var audience = jwtSettings["Audience"] ?? "AquaControl";
-
-        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secretKey));
-        var credentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
-
-        var claims = new[]
+        // Get IP address from various headers (for proxy scenarios)
+        var ipAddress = HttpContext.Connection.RemoteIpAddress?.ToString();
+        
+        if (string.IsNullOrEmpty(ipAddress) || ipAddress == "::1")
         {
-            new Claim(ClaimTypes.NameIdentifier, user.Id),
-            new Claim(ClaimTypes.Name, user.Username),
-            new Claim(ClaimTypes.Email, user.Email),
-            new Claim(ClaimTypes.GivenName, user.FirstName),
-            new Claim(ClaimTypes.Surname, user.LastName),
-            new Claim("jti", Guid.NewGuid().ToString())
-        };
-
-        // Add role claims
-        var roleClaims = user.Roles.Select(role => new Claim(ClaimTypes.Role, role));
-        var allClaims = claims.Concat(roleClaims).ToArray();
-
-        var accessToken = new JwtSecurityToken(
-            issuer: issuer,
-            audience: audience,
-            claims: allClaims,
-            expires: DateTime.UtcNow.AddHours(1),
-            signingCredentials: credentials
-        );
-
-        var refreshToken = new JwtSecurityToken(
-            issuer: issuer,
-            audience: audience,
-            claims: new[] { new Claim(ClaimTypes.NameIdentifier, user.Id) },
-            expires: DateTime.UtcNow.AddDays(7),
-            signingCredentials: credentials
-        );
-
-        return (
-            new JwtSecurityTokenHandler().WriteToken(accessToken),
-            new JwtSecurityTokenHandler().WriteToken(refreshToken)
-        );
+            ipAddress = HttpContext.Request.Headers["X-Forwarded-For"].FirstOrDefault();
+        }
+        
+        if (string.IsNullOrEmpty(ipAddress))
+        {
+            ipAddress = HttpContext.Request.Headers["X-Real-IP"].FirstOrDefault();
+        }
+        
+        return ipAddress ?? "Unknown";
     }
 }
 

@@ -108,6 +108,26 @@ export enum SensorType {
   Alkalinity = 'Alkalinity'
 }
 
+export type AlertSeverity = 'Critical' | 'Warning' | 'Info'
+export type AlertType = 'Temperature' | 'pH' | 'DissolvedOxygen' | 'Salinity' | 'System' | 'Maintenance'
+
+export interface Alert {
+  id: string
+  tankId?: string
+  type: AlertType
+  severity: AlertSeverity
+  title: string
+  message: string
+  value?: number
+  threshold?: number
+  unit?: string
+  createdAt: Date
+  isResolved: boolean
+  resolvedAt?: Date | null
+  resolvedBy?: string | null
+  metadata?: Record<string, any>
+}
+
 export enum SensorStatus {
   Offline = 'Offline',
   Online = 'Online',
