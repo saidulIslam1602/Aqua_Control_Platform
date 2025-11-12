@@ -201,18 +201,18 @@ public class TokenService : ITokenService
         return tokenHandler.WriteToken(token);
     }
 
-    private async Task<RefreshToken> GenerateRefreshTokenAsync(Guid userId, string ipAddress)
+    private Task<RefreshToken> GenerateRefreshTokenAsync(Guid userId, string ipAddress)
     {
         using var rngCryptoServiceProvider = RandomNumberGenerator.Create();
         var randomBytes = new byte[64];
         rngCryptoServiceProvider.GetBytes(randomBytes);
         var refreshToken = Convert.ToBase64String(randomBytes);
 
-        return new RefreshToken(
+        return Task.FromResult(new RefreshToken(
             token: refreshToken,
             userId: userId,
             expiresAt: DateTime.UtcNow.AddDays(7), // 7 days expiration
             createdByIp: ipAddress
-        );
+        ));
     }
 }

@@ -3,6 +3,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using AquaControl.Application.Common.Interfaces;
+using AquaControl.Application.Services;
 using AquaControl.Infrastructure.Persistence;
 using AquaControl.Infrastructure.ReadModels;
 using AquaControl.Infrastructure.EventStore;
@@ -16,6 +17,25 @@ public static class ServiceCollectionExtensions
         this IServiceCollection services,
         IConfiguration configuration)
     {
+        // Main Application Database
+        services.AddDbContext<ApplicationDbContext>(options =>
+        {
+            options.UseNpgsql(
+                configuration.GetConnectionString("DefaultConnection") ?? throw new InvalidOperationException("DefaultConnection string is missing"),
+                npgsqlOptions =>
+                {
+                    npgsqlOptions.EnableRetryOnFailure(
+                        maxRetryCount: 3,
+                        maxRetryDelay: TimeSpan.FromSeconds(30),
+                        errorCodesToAdd: null);
+                    
+                    npgsqlOptions.CommandTimeout(30);
+                });
+
+            options.EnableSensitiveDataLogging(false);
+            options.EnableDetailedErrors(false);
+        });
+
         // Database - Read Model
         services.AddDbContext<ReadModelDbContext>(options =>
         {
@@ -76,7 +96,13 @@ public static class ServiceCollectionExtensions
         // Repositories
         services.AddScoped<IEventStore, EventStoreRepository>();
         services.AddScoped<ITankRepository, TankRepository>();
+        services.AddScoped<IUserRepository, UserRepository>();
+        services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
         services.AddScoped<IUnitOfWork, UnitOfWork>();
+
+        // Application Services
+        services.AddScoped<IAuthenticationService, AuthenticationService>();
+        services.AddScoped<ITokenService, TokenService>();
 
         return services;
     }

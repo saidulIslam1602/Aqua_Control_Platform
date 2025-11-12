@@ -13,7 +13,7 @@ public class User : AggregateRoot<Guid>
     public string Salt { get; private set; } = string.Empty;
     public string[] Roles { get; private set; } = Array.Empty<string>();
     public bool IsActive { get; private set; } = true;
-    public DateTime CreatedAt { get; private set; }
+    public new DateTime CreatedAt { get; private set; }
     public DateTime? LastLoginAt { get; private set; }
     public DateTime? LastPasswordChangeAt { get; private set; }
     public int FailedLoginAttempts { get; private set; }
