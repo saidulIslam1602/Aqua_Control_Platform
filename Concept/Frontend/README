@@ -1,0 +1,123 @@
+# Frontend Concept Directory
+
+This directory contains theoretical explanations of Frontend layer concepts, patterns, and architecture used in the AquaCulture Platform Vue.js 3 frontend.
+
+## Files Overview
+
+### 1. Vue3Architecture
+**Focus**: Vue.js 3 architecture and patterns
+
+**Topics Covered**:
+- Vue.js 3 fundamentals
+- Composition API vs Options API
+- Reactivity system (ref, reactive, computed)
+- Component communication (props, events, provide/inject)
+- Component architecture layers
+- Routing with Vue Router
+- Performance optimization
+- TypeScript integration
+
+**Key Takeaway**: Vue.js 3 provides a flexible, performant framework with Composition API, reactivity system, and excellent TypeScript support.
+
+---
+
+### 2. StateManagement
+**Focus**: Pinia state management patterns
+
+**Topics Covered**:
+- What is state management
+- Pinia vs Vuex advantages
+- Store structure (state, getters, actions)
+- Optimistic updates implementation
+- Store composition patterns
+- State persistence
+- Real-time integration
+- Best practices
+
+**Key Takeaway**: Pinia provides simple, powerful state management with TypeScript support and optimistic updates for better UX.
+
+---
+
+## Reading Order
+
+**For Beginners**:
+1. Start with `Vue3Architecture.md` - Understand Vue.js 3 fundamentals
+2. Read `StateManagement.md` - Learn Pinia patterns
+
+**For Reference**:
+- Use `Vue3Architecture.md` when working with components and reactivity
+- Use `StateManagement.md` when implementing stores and state logic
+
+---
+
+## Quick Reference
+
+### Vue.js 3 Key Concepts
+- **Composition API**: Organize logic with functions
+- **Reactivity**: ref(), reactive(), computed(), watch()
+- **Components**: Props down, events up
+- **Router**: Navigation and route management
+
+### Pinia State Management
+- **State**: Reactive data (ref/reactive)
+- **Getters**: Computed properties
+- **Actions**: Functions that modify state
+- **Optimistic Updates**: Immediate UI feedback
+
+---
+
+## Frontend Architecture
+
+### Layer Structure
+```
+┌─────────────────────────────────────────┐
+│           Presentation Layer            │
+│  Components, Views, Layouts             │
+└─────────────────────────────────────────┘
+┌─────────────────────────────────────────┐
+│           Application Layer             │
+│  Composables, Stores, Services          │
+└─────────────────────────────────────────┘
+┌─────────────────────────────────────────┐
+│         Infrastructure Layer            │
+│  HTTP Client, WebSockets, Storage       │
+└─────────────────────────────────────────┘
+```
+
+### Key Technologies
+- **Vue.js 3**: Progressive framework with Composition API
+- **Pinia**: State management with TypeScript support
+- **Vue Router**: Client-side routing
+- **Axios**: HTTP client with interceptors
+- **SignalR**: Real-time communication
+- **TypeScript**: Type safety and better DX
+- **Vite**: Fast build tool and dev server
+
+---
+
+## Related Concepts
+
+- See `Concept/Layers/` for how Frontend relates to Backend layers
+- See `Concept/Application/` for backend Application layer concepts
+- See `Concept/Infrastructure/` for backend Infrastructure patterns
+
+---
+
+## Frontend Responsibilities
+
+**Frontend Layer Provides**:
+- User interface components
+- State management (Pinia stores)
+- API communication (services)
+- Real-time updates (SignalR)
+- Client-side routing
+- Form validation and user input
+
+**Frontend Layer Depends On**:
+- Backend API (REST/GraphQL)
+- Real-time hubs (SignalR)
+- Authentication services
+
+**Frontend Layer is Used By**:
+- End users through web browsers
+- Mobile apps (if using same API)
