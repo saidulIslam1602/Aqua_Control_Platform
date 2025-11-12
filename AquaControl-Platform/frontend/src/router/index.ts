@@ -14,6 +14,11 @@ const NotFoundView = () => import('@/views/common/NotFoundView.vue')
 const routes: RouteRecordRaw[] = [
   {
     path: '/',
+    name: 'Home',
+    redirect: '/dashboard'
+  },
+  {
+    path: '/dashboard',
     name: 'Dashboard',
     component: DashboardView,
     meta: { requiresAuth: true, title: 'Dashboard' }
@@ -78,8 +83,8 @@ router.beforeEach(async (_to, _from, next) => {
   
   // Check authentication
   if (_to.meta.requiresAuth && !authStore.isAuthenticated) {
-    // Redirect to login (will be handled by App.vue)
-    next({ name: 'Dashboard' })
+    // User needs to authenticate - App.vue will show login form
+    next(false) // Cancel navigation, let App.vue handle showing login
     return
   }
   

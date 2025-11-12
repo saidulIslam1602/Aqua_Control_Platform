@@ -4,7 +4,7 @@ import type { LoginCredentials, LoginResponse, TokenResponse, RefreshTokenReques
 export const authService = {
   async login(credentials: LoginCredentials): Promise<LoginResponse> {
     try {
-      const response = await httpClient.post<LoginResponse>('/auth/login', credentials)
+      const response = await httpClient.post<LoginResponse>('/api/auth/login', credentials)
       return response.data
     } catch (error) {
       console.error('Login failed:', error)
@@ -14,7 +14,7 @@ export const authService = {
 
   async refreshToken(refreshToken: string): Promise<TokenResponse> {
     try {
-      const response = await httpClient.post<TokenResponse>('/auth/refresh', { 
+      const response = await httpClient.post<TokenResponse>('/api/auth/refresh', { 
         refreshToken 
       } as RefreshTokenRequest)
       return response.data
@@ -26,7 +26,7 @@ export const authService = {
 
   async logout(): Promise<void> {
     try {
-      await httpClient.post('/auth/logout')
+      await httpClient.post('/api/auth/logout')
     } catch (error) {
       console.error('Logout failed:', error)
       // Don't throw error for logout - clear local state anyway
@@ -35,7 +35,7 @@ export const authService = {
 
   async validateToken(token: string): Promise<boolean> {
     try {
-      await httpClient.get('/auth/validate', {
+      await httpClient.get('/api/auth/validate', {
         headers: {
           Authorization: `Bearer ${token}`
         }
@@ -49,7 +49,7 @@ export const authService = {
 
   async getUserProfile(token: string): Promise<any> {
     try {
-      const response = await httpClient.get('/auth/profile', {
+      const response = await httpClient.get('/api/auth/profile', {
         headers: {
           Authorization: `Bearer ${token}`
         }

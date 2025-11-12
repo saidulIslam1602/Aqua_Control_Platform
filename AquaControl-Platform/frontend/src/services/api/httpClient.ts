@@ -14,7 +14,11 @@ class HttpClient {
   private readonly timeout: number = 30000
 
   constructor() {
-    this.baseURL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'
+    // In development, use empty string to rely on Vite proxy
+    // In production, use the full API URL
+    this.baseURL = import.meta.env.PROD 
+      ? (import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000')
+      : '' // Use relative URLs in development to leverage Vite proxy
     
     this.client = axios.create({
       baseURL: this.baseURL,

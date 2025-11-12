@@ -50,20 +50,31 @@ export default defineConfig(({ mode }) => {
     },
     server: {
       port: 5173,
-      host: true,
+      host: '0.0.0.0', // Allow external connections
       proxy: {
         '/api': {
-          target: env.VITE_API_BASE_URL || 'http://localhost:5000',
+          target: 'http://backend:5000', // Use Docker service name
           changeOrigin: true,
-          secure: false
+          secure: false,
+          configure: (proxy, _options) => {
+            proxy.on('error', (err, _req, _res) => {
+              console.log('Proxy error:', err)
+            })
+            proxy.on('proxyReq', (proxyReq, req, _res) => {
+              console.log('Sending Request to the Target:', req.method, req.url)
+            })
+            proxy.on('proxyRes', (proxyRes, req, _res) => {
+              console.log('Received Response from the Target:', proxyRes.statusCode, req.url)
+            })
+          }
         },
         '/graphql': {
-          target: env.VITE_GRAPHQL_ENDPOINT || 'http://localhost:5000',
+          target: 'http://backend:5000',
           changeOrigin: true,
           secure: false
         },
         '/hubs': {
-          target: env.VITE_SIGNALR_HUB_URL || 'http://localhost:5000',
+          target: 'http://backend:5000',
           changeOrigin: true,
           secure: false,
           ws: true

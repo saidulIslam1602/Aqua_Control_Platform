@@ -27,6 +27,8 @@ export interface User {
   firstName: string
   lastName: string
   roles: string[]
+  createdAt?: string
+  lastLoginAt?: string
 }
 
 export interface AuthState {

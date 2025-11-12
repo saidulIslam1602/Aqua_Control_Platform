@@ -86,15 +86,21 @@ const handleLogin = async () => {
     if (valid) {
       isLoading.value = true
       try {
-        await authStore.login({
+        const success = await authStore.login({
           username: loginForm.value.username,
           password: loginForm.value.password
         })
         
-        ElMessage.success('Login successful')
-        router.push('/')
+        if (success) {
+          ElMessage.success('Login successful')
+          // Redirect to dashboard
+          await router.push('/dashboard')
+        } else {
+          ElMessage.error('Invalid username or password')
+        }
       } catch (error: any) {
-        ElMessage.error(error.message || 'Login failed')
+        console.error('Login error:', error)
+        ElMessage.error(error.response?.data?.message || error.message || 'Login failed')
       } finally {
         isLoading.value = false
       }
