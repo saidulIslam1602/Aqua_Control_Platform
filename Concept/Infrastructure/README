@@ -54,6 +54,25 @@ This directory contains theoretical explanations of Infrastructure layer concept
 
 **Key Takeaway**: Repository pattern provides abstraction for data access, separating business logic from database concerns.
 
+### 4. AWSDevOps
+**Focus**: AWS infrastructure deployment and DevOps practices
+
+**Topics Covered**:
+- Infrastructure as Code (Terraform)
+- AWS EKS (Kubernetes) cluster setup
+- RDS PostgreSQL with TimescaleDB
+- ElastiCache Redis for caching
+- S3 and EFS storage solutions
+- VPC networking and security
+- CloudWatch monitoring and alerting
+- Prometheus and Grafana integration
+- Multi-environment deployment (dev, staging, prod)
+- High availability and scalability
+- Security best practices
+- Cost optimization strategies
+
+**Key Takeaway**: Infrastructure as Code enables reproducible, scalable, and maintainable cloud infrastructure deployments with enterprise-grade security and monitoring.
+
 ---
 
 ## Reading Order
@@ -62,11 +81,13 @@ This directory contains theoretical explanations of Infrastructure layer concept
 1. Start with `RepositoryPattern.md` - Understand data access abstraction
 2. Read `EventSourcing.md` - Understand event storage
 3. Read `ReadModels.md` - Understand query optimization
+4. Read `AWSDevOps.md` - Understand cloud infrastructure deployment
 
 **For Reference**:
 - Use `RepositoryPattern.md` when implementing repositories
 - Use `EventSourcing.md` when working with event store
 - Use `ReadModels.md` when optimizing queries
+- Use `AWSDevOps.md` when deploying to AWS or managing infrastructure
 
 ---
 
@@ -90,6 +111,14 @@ This directory contains theoretical explanations of Infrastructure layer concept
 - Implementation in Infrastructure
 - Use Unit of Work for transactions
 
+### AWS DevOps
+- Infrastructure as Code (Terraform)
+- Kubernetes orchestration (EKS)
+- Managed databases (RDS, ElastiCache)
+- Cloud storage (S3, EFS)
+- Monitoring and observability
+- Multi-environment support
+
 ---
 
 ## Related Concepts
@@ -97,6 +126,7 @@ This directory contains theoretical explanations of Infrastructure layer concept
 - See `Concept/Layers/` for how Infrastructure relates to Domain and Application layers
 - See `Concept/Application/` for Application layer concepts
 - See `Concept/Backend/` for Domain layer concepts
+- See `Concept/DataEngineering/` for data engineering and analytics infrastructure
 
 ---
 
@@ -109,12 +139,17 @@ This directory contains theoretical explanations of Infrastructure layer concept
 - Database contexts
 - Projection handlers
 - File storage services
+- Cloud infrastructure deployment (Terraform)
+- Container orchestration (Kubernetes/EKS)
+- Monitoring and observability (CloudWatch, Prometheus, Grafana)
 
 **Infrastructure Layer Depends On**:
 - Domain layer (implements domain interfaces)
 - Application layer (implements application interfaces)
+- AWS services (for cloud deployment)
 
 **Infrastructure Layer is Used By**:
 - Application layer (via dependency injection)
 - Presentation layer (via dependency injection)
+- DevOps teams (for infrastructure management)
 

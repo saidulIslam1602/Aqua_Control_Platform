@@ -1,17 +1,16 @@
-# Theoretical Concepts: Four-Layer Architecture (Domain, Application, Infrastructure, Frontend)
+# Theoretical Concepts: Complete System Architecture (Domain, Application, Infrastructure, Frontend, Data Engineering)
 
 ## 1. Overview: Complete Full-Stack System Architecture
 
-The **Domain**, **Application**, **Infrastructure**, and **Frontend** layers form a complete, production-ready full-stack system following Clean Architecture principles.
+The **Domain**, **Application**, **Infrastructure**, **Frontend**, and **Data Engineering** layers form a complete, production-ready full-stack system following Clean Architecture principles with real-time analytics and ML capabilities.
 
-**Four-Layer Model**:
+**Complete System Architecture**:
 ```
 ┌─────────────────────────────────────┐
 │        Frontend Layer               │
-│  (User Interface & Client State)  │
+│  (User Interface & Client State)     │
 └──────────────┬──────────────────────┘
                │ HTTP/WebSocket
-               │ (API Communication)
                ▼
 ┌─────────────────────────────────────┐
 │      Application Layer              │
@@ -28,7 +27,19 @@ The **Domain**, **Application**, **Infrastructure**, and **Frontend** layers for
                │ implements
 ┌──────────────┴──────────────────────┐
 │     Infrastructure Layer             │
-│  (Persistence & External Services)  │
+│  (Persistence & External Services)   │
+└─────────────────────────────────────┘
+               │
+               │ Domain Events
+               │ (Kafka)
+               ▼
+┌─────────────────────────────────────┐
+│     Data Engineering Layer           │
+│  (Real-time Analytics & ML)         │
+│  - Kafka (Event Streaming)          │
+│  - TimescaleDB (Time-series)        │
+│  - Kafka Streams (Processing)       │
+│  - ML Feature Engineering           │
 └─────────────────────────────────────┘
 ```
 
@@ -109,6 +120,24 @@ The **Domain**, **Application**, **Infrastructure**, and **Frontend** layers for
 
 **Key Principle**: Technical implementation, realizes Domain and Application interfaces
 
+### Data Engineering Layer (Analytics & ML)
+
+**What It Does**:
+- Consumes domain events from Infrastructure (via Kafka)
+- Processes events in real-time (Kafka Streams)
+- Stores time-series data (TimescaleDB)
+- Engineers ML features
+- Provides analytics and predictions
+- Monitors data quality
+
+**What It Doesn't Do**:
+- Contain business rules (belongs in Domain)
+- Contain use case logic (belongs in Application)
+- Know about HTTP (belongs in Application)
+- Modify domain state (read-only analytics)
+
+**Key Principle**: Parallel data processing layer for analytics and ML, consumes events from backend
+
 ---
 
 ## 3. Dependency Flow
@@ -130,14 +159,21 @@ Domain Layer ←──────────────────┐
     ▲                           │
     │ implements interfaces     │
     │                           │
-Infrastructure Layer ───────────┘
+Infrastructure Layer ────────────┘
     │
     │ also implements
     │ Application interfaces
     │
-    └───────────────────────────┐
-                                │
-Application Layer (interfaces)  │
+    │ Domain Events (Kafka)
+    │ consumes
+    ▼
+Data Engineering Layer
+    │
+    │ (Independent parallel layer)
+    │ - Kafka (Event Streaming)
+    │ - TimescaleDB (Time-series)
+    │ - Kafka Streams (Processing)
+    │ - ML Pipeline (Features)
 ```
 
 **Key Points**:
@@ -147,10 +183,48 @@ Application Layer (interfaces)  │
 - Domain defines interfaces but doesn't depend on Infrastructure
 - Application defines interfaces but doesn't depend on Infrastructure directly
 - Frontend is completely decoupled from backend implementation
+- Data Engineering consumes events from Infrastructure (via Kafka)
+- Data Engineering is a parallel, independent analytics layer
 
 ---
 
-## 4. Complete Request Flow
+## 4. Data Engineering Integration
+
+### How Data Engineering Fits
+
+**Data Engineering Layer**:
+- **Consumes** domain events from Infrastructure (via Kafka)
+- **Processes** events in real-time (Kafka Streams)
+- **Stores** time-series data (TimescaleDB)
+- **Engineers** ML features
+- **Provides** analytics and predictions
+
+**Integration Points**:
+```
+Infrastructure Layer
+    │
+    │ Publishes domain events
+    │
+    ▼
+Kafka Topics
+    │
+    │ Consumed by
+    ▼
+Data Engineering Layer
+    ├─> Kafka Streams (Real-time processing)
+    ├─> TimescaleDB (Time-series storage)
+    └─> ML Pipeline (Feature engineering)
+```
+
+**Key Characteristics**:
+- **Read-Only**: Doesn't modify domain state
+- **Asynchronous**: Processes events asynchronously
+- **Independent**: Can be scaled independently
+- **Analytics Focus**: Optimized for analytics and ML
+
+---
+
+## 5. Complete Request Flow
 
 ### Creating a Tank - All Layers Working Together
 
@@ -247,6 +321,17 @@ Application Layer (interfaces)  │
 │     - RealTimeStore receives TankCreatedEvent              │
 │     - TankStore updates UI with real-time data            │
 │     - UI automatically reflects changes                     │
+└─────────────────────────────────────────────────────────────┘
+                    │
+                    │ Domain Events (Kafka)
+                    ▼
+┌─────────────────────────────────────────────────────────────┐
+│ 11. Data Engineering Layer (Event Consumption)            │
+│     - Kafka receives TankCreatedEvent                      │
+│     - Kafka Streams processes event                        │
+│     - Updates TimescaleDB time-series data                 │
+│     - Triggers ML feature engineering                      │
+│     - Updates analytics aggregations                       │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -432,7 +517,7 @@ Think of **Four-Layer Architecture** like a **restaurant with delivery**:
 
 ## 9. Summary
 
-**Four-Layer Architecture**:
+**Complete System Architecture**:
 
 **Frontend Layer**:
 - User interface and client-side state
@@ -443,16 +528,29 @@ Think of **Four-Layer Architecture** like a **restaurant with delivery**:
 - Core business logic
 - Independent and reusable
 - Defines interfaces
+- Raises domain events
 
 **Application Layer**:
 - Orchestrates domain operations
 - Implements use cases
 - Exposes APIs for Frontend
+- Publishes domain events
 
 **Infrastructure Layer**:
 - Implements data persistence
 - Provides external services
 - Implements Domain and Application interfaces
+- Publishes events to Kafka
+- Cloud infrastructure deployment (AWS EKS, RDS, ElastiCache, S3)
+- Container orchestration (Kubernetes)
+- Monitoring and observability (CloudWatch, Prometheus, Grafana)
 
-**Key Takeaway**: The four-layer architecture provides complete separation of concerns, making the system testable, maintainable, and flexible. Frontend is decoupled from backend, communicating only through well-defined APIs. Backend follows Clean Architecture with dependencies flowing inward toward Domain. This creates a robust, scalable, and maintainable full-stack system.
+**Data Engineering Layer**:
+- Consumes domain events (via Kafka)
+- Real-time stream processing (Kafka Streams)
+- Time-series data storage (TimescaleDB)
+- ML feature engineering
+- Analytics and predictions
+
+**Key Takeaway**: The complete architecture provides separation of concerns with a main application stack (Frontend, Application, Domain, Infrastructure) and a parallel data engineering layer for analytics and ML. The main stack follows Clean Architecture with dependencies flowing inward toward Domain. Infrastructure layer includes both application infrastructure (Event Store, Read Models, repositories) and cloud infrastructure (AWS EKS, RDS, ElastiCache, S3) deployed via Infrastructure as Code (Terraform). Data Engineering consumes events asynchronously, enabling real-time analytics and ML without affecting the main application flow. This creates a robust, scalable, and maintainable full-stack system with advanced analytics capabilities and enterprise-grade cloud infrastructure.
 

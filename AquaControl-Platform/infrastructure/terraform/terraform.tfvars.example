@@ -1,0 +1,24 @@
+# AquaControl Platform - Terraform Variables Example
+# Copy this file to terraform.tfvars and update with your values
+
+# AWS Configuration
+aws_region = "us-east-1"
+
+# Environment (dev, staging, prod)
+environment = "dev"
+
+# Project name
+project_name = "aquacontrol"
+
+# Alert email addresses for CloudWatch alarms
+alert_email_addresses = [
+  # "admin@example.com",
+  # "devops@example.com"
+]
+
+# Enable deletion protection for critical resources
+enable_deletion_protection = true
+
+# Backup retention days
+backup_retention_days = 30
+

@@ -17,15 +17,16 @@ Outer Layers → Inner Layers
 
 ## 2. Layer Hierarchy
 
-### Standard Clean Architecture Layers
+### Complete System Architecture Layers
 
 ```
 ┌─────────────────────────────────────┐
-│   Presentation Layer (Outermost)   │
-│   - API Controllers                 │
-│   - GraphQL Resolvers               │
-│   - SignalR Hubs                    │
+│   Frontend Layer (Outermost)        │
+│   - Vue Components                  │
+│   - Pinia Stores                    │
+│   - Services                        │
 └──────────────┬──────────────────────┘
+               │ HTTP/WebSocket
                │ depends on
                ▼
 ┌─────────────────────────────────────┐
@@ -58,10 +59,21 @@ Outer Layers → Inner Layers
 │   - Unit of Work (UnitOfWork)       │
 │   - External Services (AWS, S3)     │
 │   - Database Contexts               │
+│   - Kafka Publishers                │
 └─────────────────────────────────────┘
-               ▲
-               │ also depends on
-               │ (implements Application interfaces)
+               │
+               │ Domain Events (Kafka)
+               │ consumes (asynchronous)
+               ▼
+┌─────────────────────────────────────┐
+│   Data Engineering Layer             │
+│   (Parallel Analytics Layer)         │
+│   - Kafka (Event Streaming)         │
+│   - Kafka Streams (Processing)      │
+│   - TimescaleDB (Time-series)       │
+│   - ML Feature Engineering          │
+│   - Analytics Functions              │
+└─────────────────────────────────────┘
 ```
 
 ---
@@ -85,16 +97,20 @@ Outer Layers → Inner Layers
 ### The Rule in Practice
 
 ```
+✅ Frontend → Backend API (Application layer) (OK)
 ✅ Application → Domain (OK)
-✅ Presentation → Application (OK)
-✅ Presentation → Domain (OK, but usually goes through Application)
 ✅ Infrastructure → Domain (OK, implements Domain interfaces)
 ✅ Infrastructure → Application (OK, implements Application interfaces)
+✅ Data Engineering → Infrastructure (OK, consumes events via Kafka)
 
 ❌ Domain → Application (FORBIDDEN)
-❌ Domain → Presentation (FORBIDDEN)
+❌ Domain → Frontend (FORBIDDEN)
 ❌ Domain → Infrastructure (FORBIDDEN, except defining interfaces)
+❌ Domain → Data Engineering (FORBIDDEN)
 ❌ Application → Infrastructure (FORBIDDEN, uses interfaces only)
+❌ Application → Data Engineering (FORBIDDEN, Data Engineering consumes events)
+❌ Data Engineering → Domain (FORBIDDEN, read-only analytics)
+❌ Data Engineering → Application (FORBIDDEN, read-only analytics)
 ```
 
 ---
@@ -528,10 +544,11 @@ public class GetTankQueryHandler
 7. **No circular dependencies** possible
 
 **Layer Dependencies**:
-- **Presentation** → Application, Domain
+- **Frontend** → Backend API (Application layer)
 - **Application** → Domain
 - **Infrastructure** → Domain (implements interfaces), Application (implements interfaces)
+- **Data Engineering** → Infrastructure (consumes events via Kafka)
 - **Domain** → Nothing (defines interfaces only)
 
-**Key Takeaway**: The dependency rule ensures that business logic (Domain) remains independent and reusable. Application orchestrates and defines infrastructure needs. Infrastructure provides concrete implementations. All dependencies flow inward toward Domain, creating a stable core that can be tested, maintained, and reused independently.
+**Key Takeaway**: The dependency rule ensures that business logic (Domain) remains independent and reusable. Application orchestrates and defines infrastructure needs. Infrastructure provides concrete implementations and publishes events. Data Engineering consumes events asynchronously for analytics and ML, operating as a parallel, independent layer. All dependencies flow inward toward Domain, creating a stable core that can be tested, maintained, and reused independently. Data Engineering is decoupled from the main application flow, enabling independent scaling and evolution.
 

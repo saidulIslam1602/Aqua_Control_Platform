@@ -1,13 +1,15 @@
-# Theoretical Concepts: How Domain, Application, and Infrastructure Layers Work Together
+# Theoretical Concepts: How All Layers Work Together
 
 ## 1. The Collaboration Model
 
-Domain, Application, and Infrastructure layers work together like **orchestra, conductor, and stage crew**:
+All layers work together like **orchestra, conductor, stage crew, audience, and recording studio**:
 
 - **Domain Layer** = Musicians (perform the music/business logic)
 - **Application Layer** = Conductor (orchestrates the performance)
 - **Infrastructure Layer** = Stage Crew (provides equipment, records performance)
-- **Together** = Complete symphony (full system with persistence and services)
+- **Frontend Layer** = Audience (experiences the performance)
+- **Data Engineering Layer** = Recording Studio (analyzes and processes recordings)
+- **Together** = Complete system (full-stack application with analytics and ML)
 
 ---
 
@@ -37,6 +39,15 @@ Domain, Application, and Infrastructure layers work together like **orchestra, c
 - Handles database operations
 - Updates read models
 - Manages transactions
+- Publishes domain events to Kafka
+
+**Data Engineering Layer Role**:
+- Consumes domain events from Infrastructure (via Kafka)
+- Processes events in real-time (Kafka Streams)
+- Stores time-series data (TimescaleDB)
+- Engineers ML features
+- Provides analytics and predictions
+- Monitors data quality
 
 ### Example: Complete Orchestration with All Layers
 
@@ -229,18 +240,26 @@ public sealed class TankCapacity : ValueObject
 ### Command Flow (Write Operation) - All Layers
 
 ```
-1. Presentation Layer
+1. Frontend Layer
+   └─> User clicks "Create Tank" button
+   └─> Calls tankStore.createTank(command)
+
+2. Frontend Layer (Service)
    └─> HTTP POST /api/tanks
+   └─> HttpClient sends request
+
+3. Backend: Application Layer (API Controller)
+   └─> Receives HTTP POST /api/tanks
    └─> Creates CreateTankCommand
    └─> Sends to MediatR
 
-2. Application Layer (MediatR)
+4. Backend: Application Layer (MediatR)
    └─> Routes to CreateTankCommandHandler
 
-3. Application Layer (ValidationBehavior)
+5. Backend: Application Layer (ValidationBehavior)
    └─> Validates CreateTankCommand (FluentValidation)
 
-4. Application Layer (Handler)
+6. Backend: Application Layer (Handler)
    └─> Checks repository (via ITankRepository interface)
        └─> Infrastructure: TankRepository.GetByNameAsync()
            └─> Queries Read Model database
@@ -257,19 +276,34 @@ public sealed class TankCapacity : ValueObject
        └─> Infrastructure: UnitOfWork.SaveChangesAsync()
            └─> Saves events to Event Store database
            └─> Commits Event Store transaction
-           └─> Publishes domain events
+           └─> Publishes domain events to Kafka
 
-5. Infrastructure Layer (Projection Handler)
+7. Backend: Infrastructure Layer (Projection Handler)
    └─> TankProjectionHandler receives TankCreatedEvent
    └─> Updates Read Model (TankReadModel)
    └─> Saves to Read Model database
 
-6. Application Layer (Event Handler)
-   └─> TankCreatedEventHandler receives event
-   └─> Logs, sends notifications, etc.
+8. Backend: Infrastructure Layer (Kafka Publisher)
+   └─> Publishes TankCreatedEvent to Kafka topic
 
-7. Presentation Layer
-   └─> Returns HTTP 201 Created with tank ID
+9. Data Engineering Layer (Kafka Consumer)
+   └─> Kafka receives TankCreatedEvent
+   └─> Kafka Streams processes event
+   └─> Updates TimescaleDB time-series data
+   └─> Triggers ML feature engineering
+   └─> Updates analytics aggregations
+
+10. Backend: Application Layer (Event Handler)
+    └─> TankCreatedEventHandler receives event
+    └─> Logs, sends notifications, etc.
+
+11. Backend: Infrastructure Layer (SignalR)
+    └─> Publishes TankCreatedEvent to connected clients
+
+12. Frontend Layer
+    └─> RealTimeStore receives TankCreatedEvent
+    └─> TankStore updates UI
+    └─> Returns HTTP 201 Created with tank ID
 ```
 
 ### Query Flow (Read Operation) - All Layers
@@ -303,22 +337,27 @@ public sealed class TankCapacity : ValueObject
 
 ### Who Does What?
 
-| Responsibility | Domain Layer | Application Layer | Infrastructure Layer |
-|----------------|--------------|-------------------|----------------------|
-| **Business Rules** | ✅ Yes | ❌ No | ❌ No |
-| **Validation** | ✅ Business rules | ✅ Input validation | ❌ No |
-| **State Changes** | ✅ Methods | ❌ No (calls Domain) | ❌ No |
-| **Orchestration** | ❌ No | ✅ Yes | ❌ No |
-| **Persistence** | ❌ No | ❌ No (defines interfaces) | ✅ Yes (implements) |
-| **Event Storage** | ❌ No | ❌ No | ✅ Yes (Event Store) |
-| **Read Models** | ❌ No | ❌ No | ✅ Yes (maintains) |
-| **Projections** | ❌ No | ❌ No | ✅ Yes (updates read models) |
-| **Event Handling** | ✅ Raises events | ✅ Handles events | ✅ Projects events |
-| **DTO Mapping** | ❌ No | ✅ Yes | ❌ No |
-| **Use Cases** | ❌ No | ✅ Yes | ❌ No |
-| **Error Handling** | ✅ Exceptions | ✅ Result pattern | ✅ Logging |
-| **External Services** | ❌ No | ❌ No | ✅ Yes (AWS, etc.) |
-| **Database Access** | ❌ No | ❌ No | ✅ Yes (EF Core) |
+| Responsibility | Domain | Application | Infrastructure | Frontend | Data Engineering |
+|----------------|--------|-------------|----------------|----------|------------------|
+| **Business Rules** | ✅ Yes | ❌ No | ❌ No | ❌ No | ❌ No |
+| **Validation** | ✅ Business rules | ✅ Input validation | ❌ No | ✅ Form validation | ❌ No |
+| **State Changes** | ✅ Methods | ❌ No (calls Domain) | ❌ No | ❌ No | ❌ No |
+| **Orchestration** | ❌ No | ✅ Yes | ❌ No | ❌ No | ❌ No |
+| **Persistence** | ❌ No | ❌ No (defines interfaces) | ✅ Yes (implements) | ❌ No | ✅ Yes (TimescaleDB) |
+| **Event Storage** | ❌ No | ❌ No | ✅ Yes (Event Store) | ❌ No | ❌ No |
+| **Read Models** | ❌ No | ❌ No | ✅ Yes (maintains) | ❌ No | ❌ No |
+| **Projections** | ❌ No | ❌ No | ✅ Yes (updates read models) | ❌ No | ❌ No |
+| **Event Handling** | ✅ Raises events | ✅ Handles events | ✅ Projects events | ✅ Receives events | ✅ Consumes events |
+| **DTO Mapping** | ❌ No | ✅ Yes | ❌ No | ✅ Yes | ❌ No |
+| **Use Cases** | ❌ No | ✅ Yes | ❌ No | ❌ No | ❌ No |
+| **Error Handling** | ✅ Exceptions | ✅ Result pattern | ✅ Logging | ✅ Error UI | ✅ Logging |
+| **External Services** | ❌ No | ❌ No | ✅ Yes (AWS, etc.) | ❌ No | ❌ No |
+| **Database Access** | ❌ No | ❌ No | ✅ Yes (EF Core) | ❌ No | ✅ Yes (TimescaleDB) |
+| **Stream Processing** | ❌ No | ❌ No | ❌ No | ❌ No | ✅ Yes (Kafka Streams) |
+| **ML Features** | ❌ No | ❌ No | ❌ No | ❌ No | ✅ Yes (Feature Engineering) |
+| **Analytics** | ❌ No | ❌ No | ❌ No | ❌ No | ✅ Yes (Analytics Functions) |
+| **User Interface** | ❌ No | ❌ No | ❌ No | ✅ Yes | ❌ No |
+| **Client State** | ❌ No | ❌ No | ❌ No | ✅ Yes (Pinia) | ❌ No |
 
 ---
 
@@ -502,13 +541,14 @@ Think of **Domain and Application** like a **construction project**:
 
 ## 10. Summary
 
-**How They Work Together**:
+**How All Layers Work Together**:
 
 1. **Application Orchestrates**:
    - Receives requests
    - Coordinates operations
    - Calls Domain methods
    - Uses Infrastructure via interfaces
+   - Exposes APIs for Frontend
 
 2. **Domain Executes**:
    - Validates business rules
@@ -523,17 +563,48 @@ Think of **Domain and Application** like a **construction project**:
    - Implements Domain and Application interfaces
    - Updates read models
    - Manages transactions
+   - Publishes events to Kafka
+   - Cloud infrastructure deployment (AWS EKS, RDS, ElastiCache)
+   - Container orchestration (Kubernetes)
+   - Monitoring and observability (CloudWatch, Prometheus, Grafana)
 
-4. **Communication Mechanisms**:
+4. **Frontend Provides**:
+   - User interface and experience
+   - Client-side state management
+   - Communicates with backend via API
+   - Real-time updates via SignalR
+
+5. **Data Engineering Analyzes**:
+   - Consumes domain events (via Kafka)
+   - Processes events in real-time
+   - Stores time-series data
+   - Engineers ML features
+   - Provides analytics and predictions
+
+6. **Communication Mechanisms**:
    - Direct method calls (Application → Domain)
    - Interface calls (Application → Infrastructure)
-   - Domain events (Domain → Application → Infrastructure)
+   - HTTP/WebSocket (Frontend → Backend API)
+   - Domain events (Domain → Infrastructure → Kafka → Data Engineering)
+   - Real-time events (Infrastructure → SignalR → Frontend)
    - Value objects (validation at Domain level)
 
-5. **Clear Responsibilities**:
+7. **Clear Responsibilities**:
    - Domain: Business logic and interfaces
-   - Application: Use cases, orchestration, and interfaces
-   - Infrastructure: Persistence, external services, implementations
+   - Application: Use cases, orchestration, and APIs
+   - Infrastructure: Persistence, external services, event publishing, cloud deployment
+   - Frontend: User interface and client state
+   - Data Engineering: Analytics, ML features, time-series processing
 
-**Key Takeaway**: Application layer is the conductor, Domain layer is the orchestra, Infrastructure layer is the stage crew. Application orchestrates and coordinates, Domain performs the business logic, Infrastructure provides the technical foundation. They work together seamlessly, with clear boundaries and responsibilities, to implement a complete, production-ready system.
+8. **Infrastructure Deployment (AWS DevOps)**:
+   - Infrastructure as Code (Terraform) for reproducible deployments
+   - EKS cluster for container orchestration
+   - RDS PostgreSQL with TimescaleDB for time-series data
+   - ElastiCache Redis for caching and session storage
+   - S3 and EFS for scalable storage
+   - VPC networking with security groups
+   - CloudWatch, Prometheus, and Grafana for monitoring
+   - Multi-environment support (dev, staging, prod)
+
+**Key Takeaway**: Application layer is the conductor, Domain layer is the orchestra, Infrastructure layer is the stage crew, Frontend layer is the audience, and Data Engineering layer is the recording studio. Application orchestrates and coordinates, Domain performs the business logic, Infrastructure provides the technical foundation and publishes events, Frontend provides the user experience, and Data Engineering analyzes events for analytics and ML. They work together seamlessly, with clear boundaries and responsibilities, to implement a complete, production-ready system with advanced analytics capabilities.
 
