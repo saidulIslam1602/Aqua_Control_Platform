@@ -1,24 +1,25 @@
-# Theoretical Concepts: How Domain and Application Layers Work Together
+# Theoretical Concepts: How Domain, Application, and Infrastructure Layers Work Together
 
 ## 1. The Collaboration Model
 
-Domain and Application layers work together like **orchestra and musicians**:
+Domain, Application, and Infrastructure layers work together like **orchestra, conductor, and stage crew**:
 
 - **Domain Layer** = Musicians (perform the music/business logic)
 - **Application Layer** = Conductor (orchestrates the performance)
-- **Together** = Beautiful symphony (complete use case)
+- **Infrastructure Layer** = Stage Crew (provides equipment, records performance)
+- **Together** = Complete symphony (full system with persistence and services)
 
 ---
 
 ## 2. The Orchestration Pattern
 
-### Application Orchestrates, Domain Executes
+### Application Orchestrates, Domain Executes, Infrastructure Provides
 
 **Application Layer Role**:
 - Receives request (command/query)
 - Coordinates operations
 - Calls domain methods
-- Handles infrastructure
+- Uses infrastructure via interfaces
 - Returns result
 
 **Domain Layer Role**:
@@ -27,33 +28,54 @@ Domain and Application layers work together like **orchestra and musicians**:
 - Enforces invariants
 - Raises events
 - Maintains consistency
+- Defines interfaces for Infrastructure
 
-### Example: Complete Orchestration
+**Infrastructure Layer Role**:
+- Implements data persistence
+- Provides external services
+- Implements Domain and Application interfaces
+- Handles database operations
+- Updates read models
+- Manages transactions
+
+### Example: Complete Orchestration with All Layers
 
 ```csharp
 // APPLICATION LAYER - Orchestrates
 public class CreateTankCommandHandler
 {
+    private readonly ITankRepository _repository;  // Interface from Application
+    private readonly IUnitOfWork _unitOfWork;      // Interface from Application
+    
     public async Task<Result<Guid>> Handle(CreateTankCommand command)
     {
-        // 1. APPLICATION: Check preconditions
+        // 1. APPLICATION: Check preconditions (uses Infrastructure via interface)
         var existing = await _repository.GetByNameAsync(command.Name);
+        // Infrastructure: TankRepository queries Read Model database
         if (existing != null)
             return Error.Conflict("Tank.Exists", "Tank already exists");
         
         // 2. APPLICATION: Create Domain value objects
         var capacity = TankCapacity.Create(command.Capacity, command.CapacityUnit);
+        // Domain: Validates capacity > 0, valid unit
         var location = Location.Create(command.Building, command.Room);
+        // Domain: Validates building and room not empty
         
         // 3. APPLICATION: Call Domain factory
         var tank = Tank.Create(command.Name, capacity, location, command.TankType);
-        //     ↑ DOMAIN: Validates, creates aggregate, raises event
+        // Domain: Validates name, creates aggregate, raises TankCreatedEvent
         
-        // 4. APPLICATION: Persist via infrastructure
+        // 4. APPLICATION: Persist via Infrastructure (via interface)
         await _repository.AddAsync(tank);
-        await _unitOfWork.SaveChangesAsync();
+        // Infrastructure: TankRepository saves events to Event Store
         
-        // 5. APPLICATION: Return result
+        await _unitOfWork.SaveChangesAsync();
+        // Infrastructure: UnitOfWork commits transactions, publishes events
+        
+        // 5. Infrastructure: Projection handler updates Read Models
+        // (automatically triggered by domain event)
+        
+        // 6. APPLICATION: Return result
         return Result.Success(tank.Id.Value);
     }
 }
@@ -204,7 +226,7 @@ public sealed class TankCapacity : ValueObject
 
 ## 4. Data Flow
 
-### Command Flow (Write Operation)
+### Command Flow (Write Operation) - All Layers
 
 ```
 1. Presentation Layer
@@ -215,26 +237,42 @@ public sealed class TankCapacity : ValueObject
 2. Application Layer (MediatR)
    └─> Routes to CreateTankCommandHandler
 
-3. Application Layer (Handler)
-   └─> Validates command (FluentValidation)
-   └─> Checks repository (infrastructure)
+3. Application Layer (ValidationBehavior)
+   └─> Validates CreateTankCommand (FluentValidation)
+
+4. Application Layer (Handler)
+   └─> Checks repository (via ITankRepository interface)
+       └─> Infrastructure: TankRepository.GetByNameAsync()
+           └─> Queries Read Model database
    └─> Creates value objects (Domain validates)
    └─> Calls Tank.Create() (Domain)
        └─> Domain validates business rules
        └─> Domain creates aggregate
        └─> Domain raises TankCreatedEvent
-   └─> Saves to repository (infrastructure)
-   └─> Commits changes (Unit of Work)
+   └─> Saves to repository (via ITankRepository interface)
+       └─> Infrastructure: TankRepository.AddAsync()
+           └─> Collects domain events
+           └─> Prepares to save to Event Store
+   └─> Commits changes (via IUnitOfWork interface)
+       └─> Infrastructure: UnitOfWork.SaveChangesAsync()
+           └─> Saves events to Event Store database
+           └─> Commits Event Store transaction
+           └─> Publishes domain events
 
-4. Application Layer (Event Handler)
-   └─> Reacts to TankCreatedEvent
+5. Infrastructure Layer (Projection Handler)
+   └─> TankProjectionHandler receives TankCreatedEvent
+   └─> Updates Read Model (TankReadModel)
+   └─> Saves to Read Model database
+
+6. Application Layer (Event Handler)
+   └─> TankCreatedEventHandler receives event
    └─> Logs, sends notifications, etc.
 
-5. Presentation Layer
+7. Presentation Layer
    └─> Returns HTTP 201 Created with tank ID
 ```
 
-### Query Flow (Read Operation)
+### Query Flow (Read Operation) - All Layers
 
 ```
 1. Presentation Layer
@@ -247,8 +285,11 @@ public sealed class TankCapacity : ValueObject
 
 3. Application Layer (Handler)
    └─> Builds specification (filter)
-   └─> Queries repository (infrastructure)
-       └─> Repository loads Domain aggregates
+   └─> Queries repository (via ITankRepository interface)
+       └─> Infrastructure: TankRepository.GetPagedAsync()
+           └─> Queries Read Model database (fast, optimized)
+           └─> Gets TankReadModel entities
+           └─> Converts to Domain aggregates (if needed)
    └─> Maps Domain to DTOs
    └─> Returns PagedResult<TankDto>
 
@@ -262,17 +303,22 @@ public sealed class TankCapacity : ValueObject
 
 ### Who Does What?
 
-| Responsibility | Domain Layer | Application Layer |
-|----------------|--------------|-------------------|
-| **Business Rules** | ✅ Yes | ❌ No |
-| **Validation** | ✅ Business rules | ✅ Input validation |
-| **State Changes** | ✅ Methods | ❌ No (calls Domain) |
-| **Orchestration** | ❌ No | ✅ Yes |
-| **Persistence** | ❌ No | ✅ Coordinates |
-| **Event Handling** | ✅ Raises events | ✅ Handles events |
-| **DTO Mapping** | ❌ No | ✅ Yes |
-| **Use Cases** | ❌ No | ✅ Yes |
-| **Error Handling** | ✅ Exceptions | ✅ Result pattern |
+| Responsibility | Domain Layer | Application Layer | Infrastructure Layer |
+|----------------|--------------|-------------------|----------------------|
+| **Business Rules** | ✅ Yes | ❌ No | ❌ No |
+| **Validation** | ✅ Business rules | ✅ Input validation | ❌ No |
+| **State Changes** | ✅ Methods | ❌ No (calls Domain) | ❌ No |
+| **Orchestration** | ❌ No | ✅ Yes | ❌ No |
+| **Persistence** | ❌ No | ❌ No (defines interfaces) | ✅ Yes (implements) |
+| **Event Storage** | ❌ No | ❌ No | ✅ Yes (Event Store) |
+| **Read Models** | ❌ No | ❌ No | ✅ Yes (maintains) |
+| **Projections** | ❌ No | ❌ No | ✅ Yes (updates read models) |
+| **Event Handling** | ✅ Raises events | ✅ Handles events | ✅ Projects events |
+| **DTO Mapping** | ❌ No | ✅ Yes | ❌ No |
+| **Use Cases** | ❌ No | ✅ Yes | ❌ No |
+| **Error Handling** | ✅ Exceptions | ✅ Result pattern | ✅ Logging |
+| **External Services** | ❌ No | ❌ No | ✅ Yes (AWS, etc.) |
+| **Database Access** | ❌ No | ❌ No | ✅ Yes (EF Core) |
 
 ---
 
@@ -462,22 +508,32 @@ Think of **Domain and Application** like a **construction project**:
    - Receives requests
    - Coordinates operations
    - Calls Domain methods
-   - Handles infrastructure
+   - Uses Infrastructure via interfaces
 
 2. **Domain Executes**:
    - Validates business rules
    - Enforces invariants
    - Changes state
    - Raises events
+   - Defines interfaces
 
-3. **Communication Mechanisms**:
-   - Direct method calls (synchronous)
-   - Domain events (asynchronous)
-   - Value objects (validation)
+3. **Infrastructure Provides**:
+   - Implements data persistence
+   - Provides external services
+   - Implements Domain and Application interfaces
+   - Updates read models
+   - Manages transactions
 
-4. **Clear Responsibilities**:
-   - Domain: Business logic
-   - Application: Use cases and orchestration
+4. **Communication Mechanisms**:
+   - Direct method calls (Application → Domain)
+   - Interface calls (Application → Infrastructure)
+   - Domain events (Domain → Application → Infrastructure)
+   - Value objects (validation at Domain level)
 
-**Key Takeaway**: Application layer is the conductor, Domain layer is the orchestra. Application orchestrates and coordinates, Domain performs the business logic. They work together seamlessly, with clear boundaries and responsibilities, to implement complete use cases.
+5. **Clear Responsibilities**:
+   - Domain: Business logic and interfaces
+   - Application: Use cases, orchestration, and interfaces
+   - Infrastructure: Persistence, external services, implementations
+
+**Key Takeaway**: Application layer is the conductor, Domain layer is the orchestra, Infrastructure layer is the stage crew. Application orchestrates and coordinates, Domain performs the business logic, Infrastructure provides the technical foundation. They work together seamlessly, with clear boundaries and responsibilities, to implement a complete, production-ready system.
 

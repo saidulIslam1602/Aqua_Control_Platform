@@ -1,20 +1,28 @@
-# Theoretical Concepts: Domain and Application Layer Relationship
+# Theoretical Concepts: Domain, Application, and Infrastructure Layer Relationships
 
-## 1. Overview: Two Layers, One Purpose
+## 1. Overview: Three Layers, One System
 
-The **Domain Layer** and **Application Layer** work together to implement business logic, but they have **different responsibilities** and **different concerns**.
+The **Domain Layer**, **Application Layer**, and **Infrastructure Layer** work together to implement a complete system, each with **different responsibilities** and **different concerns**.
 
 **Domain Layer**:
 - Contains **core business logic**
 - Defines **business rules**
 - Models **domain concepts**
-- **Independent** of infrastructure
+- **Independent** of infrastructure and application
 
 **Application Layer**:
 - **Orchestrates** domain operations
 - **Coordinates** between domain and infrastructure
 - Implements **use cases**
 - **Depends on** Domain layer
+- Uses Infrastructure via interfaces
+
+**Infrastructure Layer**:
+- **Implements** data persistence
+- **Provides** external service integration
+- **Realizes** domain and application interfaces
+- **Depends on** Domain layer (implements interfaces)
+- **Depends on** Application layer (implements interfaces)
 
 ---
 
@@ -25,12 +33,21 @@ The **Domain Layer** and **Application Layer** work together to implement busine
 ```
 Application Layer → Domain Layer
      (depends on)
+     
+Infrastructure Layer → Domain Layer
+     (depends on, implements interfaces)
+     
+Infrastructure Layer → Application Layer
+     (depends on, implements interfaces)
 ```
 
-**Key Principle**: 
+**Key Principles**: 
 - ✅ Application Layer **depends on** Domain Layer
-- ❌ Domain Layer **never depends on** Application Layer
-- ✅ Domain Layer has **zero dependencies** on other layers
+- ✅ Infrastructure Layer **depends on** Domain Layer (implements interfaces)
+- ✅ Infrastructure Layer **depends on** Application Layer (implements interfaces)
+- ❌ Domain Layer **never depends on** Application or Infrastructure layers
+- ❌ Application Layer **never depends on** Infrastructure layer directly (uses interfaces)
+- ✅ Domain Layer has **zero dependencies** on other layers (except interfaces it defines)
 
 ### Why This Direction?
 
@@ -80,26 +97,48 @@ Application Layer
 ├── Validators (FluentValidation)
 ├── Specifications (TankFilterSpecification)
 ├── Behaviors (ValidationBehavior)
-└── Interfaces (ITankRepository)
+└── Interfaces (ITankRepository, IUnitOfWork)
 ```
 
 **Characteristics**:
 - Orchestrates domain operations
 - Handles application concerns
 - Depends on Domain layer
-- Uses infrastructure (via interfaces)
+- Defines interfaces for Infrastructure
+
+### Infrastructure Layer Contents
+
+```
+Infrastructure Layer
+├── Event Store (EventStoreDbContext, EventStoreRepository)
+├── Read Models (ReadModelDbContext, TankReadModel)
+├── Repositories (TankRepository)
+├── Projections (TankProjectionHandler)
+├── Unit of Work (UnitOfWork)
+├── External Services (AWS, S3, SQS, SNS)
+└── Database Contexts
+```
+
+**Characteristics**:
+- Implements data persistence
+- Provides external service integration
+- Implements Domain and Application interfaces
+- Depends on Domain and Application layers
 
 ---
 
 ## 4. How They Work Together
 
-### Example: Creating a Tank
+### Example: Creating a Tank (Complete Flow)
 
 **Step 1: Application Layer Receives Command**
 ```csharp
 // Application Layer
 public class CreateTankCommandHandler
 {
+    private readonly ITankRepository _repository;  // Interface from Application
+    private readonly IUnitOfWork _unitOfWork;      // Interface from Application
+    
     public async Task<Result<Guid>> Handle(CreateTankCommand command)
     {
         // Step 2: Application creates Domain value objects
@@ -108,12 +147,15 @@ public class CreateTankCommandHandler
         
         // Step 3: Application calls Domain factory method
         var tank = Tank.Create(command.Name, capacity, location, command.TankType);
+        // Domain validates, creates aggregate, raises TankCreatedEvent
         
-        // Step 4: Application saves via repository (infrastructure)
-        await _repository.AddAsync(tank);
-        await _unitOfWork.SaveChangesAsync();
+        // Step 4: Application saves via repository (Infrastructure implements interface)
+        await _repository.AddAsync(tank);  // Infrastructure: TankRepository.AddAsync()
+        await _unitOfWork.SaveChangesAsync();  // Infrastructure: UnitOfWork.SaveChangesAsync()
         
-        // Step 5: Application returns result
+        // Step 5: Infrastructure saves events to Event Store
+        // Step 6: Infrastructure projection handler updates Read Models
+        // Step 7: Application returns result
         return Result.Success(tank.Id.Value);
     }
 }
@@ -144,27 +186,39 @@ public sealed class Tank : AggregateRoot<TankId>
 
 **Flow Diagram**:
 ```
-Application Layer                    Domain Layer
-     │                                    │
-     │ 1. Receives Command               │
-     │    CreateTankCommand               │
-     │         │                          │
-     │ 2. Creates Value Objects           │
-     │    TankCapacity.Create() ──────────>│
-     │    Location.Create() ──────────────>│
-     │         │                          │
-     │ 3. Calls Domain Factory            │
-     │    Tank.Create() ─────────────────>│
-     │         │                          │
-     │         │                          │ 4. Domain validates
-     │         │                          │    and creates aggregate
-     │         │                          │
-     │         │<─────────────────────────│ 5. Returns Tank
-     │         │                          │
-     │ 6. Saves via Repository            │
-     │    (Infrastructure)                │
-     │         │                          │
-     │ 7. Returns Result                  │
+Application Layer          Domain Layer          Infrastructure Layer
+     │                          │                          │
+     │ 1. Receives Command      │                          │
+     │    CreateTankCommand     │                          │
+     │         │                │                          │
+     │ 2. Creates Value Objects │                          │
+     │    TankCapacity.Create()─>│                         │
+     │    Location.Create()─────>│                         │
+     │         │                │                          │
+     │ 3. Calls Domain Factory  │                          │
+     │    Tank.Create()────────>│                          │
+     │         │                │                          │
+     │         │                │ 4. Domain validates      │
+     │         │                │    and creates aggregate │
+     │         │                │    raises TankCreatedEvent│
+     │         │                │                          │
+     │         │<───────────────│ 5. Returns Tank         │
+     │         │                │                          │
+     │ 6. Saves via Repository  │                          │
+     │    _repository.AddAsync()─────────────────────────>│
+     │         │                │                          │
+     │         │                │                          │ 7. Infrastructure saves
+     │         │                │                          │    events to Event Store
+     │         │                │                          │
+     │ 8. Unit of Work          │                          │
+     │    _unitOfWork.Save()──────────────────────────────>│
+     │         │                │                          │
+     │         │                │                          │ 9. Infrastructure updates
+     │         │                │                          │    Read Models (projection)
+     │         │                │                          │
+     │         │<──────────────────────────────────────────│ 10. Returns success
+     │         │                │                          │
+     │ 11. Returns Result       │                          │
 ```
 
 ---
@@ -306,6 +360,7 @@ public class CreateTankCommandHandler
 - Enforce invariants
 - Raise domain events
 - Model domain concepts
+- Define interfaces for Infrastructure (IEventStore, etc.)
 
 **❌ Domain Layer Should NOT**:
 - Know about databases
@@ -313,6 +368,7 @@ public class CreateTankCommandHandler
 - Know about external services
 - Handle HTTP requests
 - Know about DTOs
+- Implement persistence logic
 
 ### Application Layer Responsibilities
 
@@ -320,20 +376,38 @@ public class CreateTankCommandHandler
 - Orchestrate domain operations
 - Handle use cases
 - Map between DTOs and domain models
-- Coordinate infrastructure
+- Define interfaces for Infrastructure (ITankRepository, IUnitOfWork)
 - Handle application-level validation
+- Coordinate between Domain and Infrastructure
 
 **❌ Application Layer Should NOT**:
 - Contain business rules (belongs in Domain)
 - Directly access databases (use repositories)
 - Know about HTTP (belongs in Presentation)
 - Contain domain logic (belongs in Domain)
+- Implement persistence (belongs in Infrastructure)
+
+### Infrastructure Layer Responsibilities
+
+**✅ Infrastructure Layer Should**:
+- Implement data persistence (Event Store, Read Models)
+- Implement repository interfaces
+- Provide external service integration (AWS, messaging)
+- Handle database contexts
+- Implement projection handlers
+- Provide file storage services
+
+**❌ Infrastructure Layer Should NOT**:
+- Contain business rules (belongs in Domain)
+- Contain use case logic (belongs in Application)
+- Define domain models (belongs in Domain)
+- Know about HTTP (belongs in Presentation)
 
 ---
 
 ## 8. Example: Complete Flow
 
-### Creating a Tank - Full Flow
+### Creating a Tank - Full Flow with All Layers
 
 ```
 1. API Controller (Presentation Layer)
@@ -349,21 +423,33 @@ public class CreateTankCommandHandler
    └─> Uses FluentValidation
 
 4. CreateTankCommandHandler (Application Layer)
-   └─> Checks if tank exists (via repository)
+   └─> Checks if tank exists (via ITankRepository interface)
+       └─> Infrastructure: TankRepository.GetByNameAsync()
+           └─> Queries Read Model database
    └─> Creates TankCapacity value object (Domain)
    └─> Creates Location value object (Domain)
    └─> Calls Tank.Create() (Domain)
        └─> Domain validates business rules
        └─> Domain creates aggregate
        └─> Domain raises TankCreatedEvent
-   └─> Saves tank (via repository)
-   └─> Commits changes (Unit of Work)
+   └─> Saves tank (via ITankRepository interface)
+       └─> Infrastructure: TankRepository.AddAsync()
+           └─> Saves events to Event Store
+   └─> Commits changes (via IUnitOfWork interface)
+       └─> Infrastructure: UnitOfWork.SaveChangesAsync()
+           └─> Commits Event Store transaction
+           └─> Commits Read Model transaction
 
-5. TankCreatedEventHandler (Application Layer)
+5. TankProjectionHandler (Infrastructure Layer)
+   └─> Receives TankCreatedEvent
+   └─> Updates Read Model (TankReadModel)
+   └─> Saves to Read Model database
+
+6. TankCreatedEventHandler (Application Layer)
    └─> Reacts to domain event
    └─> Logs, sends notifications, etc.
 
-6. Result returned to Controller
+7. Result returned to Controller
    └─> Returns HTTP 201 Created with tank ID
 ```
 
@@ -522,25 +608,35 @@ Think of **Domain and Application** like a **restaurant**:
 
 ## 12. Summary
 
-**Domain and Application Layers**:
+**Domain, Application, and Infrastructure Layers**:
 
 **Domain Layer**:
 - Core business logic
 - Independent and reusable
-- No dependencies on other layers
-- Contains aggregates, entities, value objects
+- No dependencies on other layers (except interfaces it defines)
+- Contains aggregates, entities, value objects, domain events
 
 **Application Layer**:
 - Orchestrates domain operations
 - Implements use cases
 - Depends on Domain layer
-- Contains commands, queries, handlers
+- Defines interfaces for Infrastructure
+- Contains commands, queries, handlers, DTOs
 
-**Relationship**:
+**Infrastructure Layer**:
+- Implements data persistence
+- Provides external service integration
+- Implements Domain and Application interfaces
+- Depends on Domain and Application layers
+- Contains repositories, event store, read models, projections
+
+**Relationships**:
 - Application **depends on** Domain
-- Domain is **independent**
-- They **work together** to implement business logic
+- Infrastructure **depends on** Domain (implements interfaces)
+- Infrastructure **depends on** Application (implements interfaces)
+- Domain is **independent** (defines interfaces only)
+- They **work together** to implement complete system
 - Clear **separation of concerns**
 
-**Key Takeaway**: Domain layer is the foundation containing pure business logic. Application layer orchestrates domain operations to implement use cases. The dependency always flows from Application to Domain, never the reverse. This ensures business logic remains independent, testable, and reusable.
+**Key Takeaway**: Domain layer is the foundation containing pure business logic. Application layer orchestrates domain operations and defines infrastructure needs. Infrastructure layer provides concrete implementations. The dependency always flows inward toward Domain, ensuring business logic remains independent, testable, and reusable.
 

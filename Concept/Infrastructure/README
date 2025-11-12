@@ -1,0 +1,120 @@
+# Infrastructure Concept Directory
+
+This directory contains theoretical explanations of Infrastructure layer concepts, patterns, and how they integrate with Domain and Application layers.
+
+## Files Overview
+
+### 1. EventSourcing
+**Focus**: Event Sourcing pattern and implementation
+
+**Topics Covered**:
+- What is Event Sourcing
+- Why use Event Sourcing
+- Event Store structure
+- How event sourcing works
+- Snapshots for performance
+- Concurrency control
+- Event replay
+- Event versioning
+- Benefits and trade-offs
+
+**Key Takeaway**: Event Sourcing stores events instead of current state, providing complete audit trail and time travel capabilities.
+
+---
+
+### 2. ReadModels
+**Focus**: CQRS Read Models and projections
+
+**Topics Covered**:
+- What are Read Models
+- Why Read Models (performance)
+- Read Model structure (denormalized)
+- How Read Models are updated (projections)
+- Read Model benefits
+- Read Model patterns
+- Eventual consistency
+- Read Model design principles
+
+**Key Takeaway**: Read Models provide fast, optimized querying by maintaining denormalized views updated from events.
+
+---
+
+### 3. RepositoryPattern
+**Focus**: Repository pattern and data access abstraction
+
+**Topics Covered**:
+- What is Repository Pattern
+- Why Repository Pattern
+- Repository interface design
+- Repository implementation
+- Event-sourced repositories
+- Unit of Work pattern
+- Best practices
+- Repository vs direct database access
+
+**Key Takeaway**: Repository pattern provides abstraction for data access, separating business logic from database concerns.
+
+---
+
+## Reading Order
+
+**For Beginners**:
+1. Start with `RepositoryPattern.md` - Understand data access abstraction
+2. Read `EventSourcing.md` - Understand event storage
+3. Read `ReadModels.md` - Understand query optimization
+
+**For Reference**:
+- Use `RepositoryPattern.md` when implementing repositories
+- Use `EventSourcing.md` when working with event store
+- Use `ReadModels.md` when optimizing queries
+
+---
+
+## Quick Reference
+
+### Event Sourcing
+- Store events, not current state
+- Rebuild state by replaying events
+- Use snapshots for performance
+- Provides complete audit trail
+
+### Read Models
+- Optimized for queries
+- Denormalized structure
+- Updated from events (projections)
+- Eventually consistent
+
+### Repository Pattern
+- Abstraction for data access
+- Interface in Application/Domain
+- Implementation in Infrastructure
+- Use Unit of Work for transactions
+
+---
+
+## Related Concepts
+
+- See `Concept/Layers/` for how Infrastructure relates to Domain and Application layers
+- See `Concept/Application/` for Application layer concepts
+- See `Concept/Backend/` for Domain layer concepts
+
+---
+
+## Infrastructure Layer Responsibilities
+
+**Infrastructure Layer Provides**:
+- Data persistence (Event Store, Read Models)
+- External service integration (AWS, messaging)
+- Repository implementations
+- Database contexts
+- Projection handlers
+- File storage services
+
+**Infrastructure Layer Depends On**:
+- Domain layer (implements domain interfaces)
+- Application layer (implements application interfaces)
+
+**Infrastructure Layer is Used By**:
+- Application layer (via dependency injection)
+- Presentation layer (via dependency injection)
+

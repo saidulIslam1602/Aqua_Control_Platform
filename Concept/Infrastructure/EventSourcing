@@ -1,0 +1,320 @@
+# Theoretical Concepts: Event Sourcing
+
+## 1. What is Event Sourcing?
+
+**Event Sourcing** is a pattern where the **state of an application is determined by a sequence of events** rather than storing the current state.
+
+**Key Principle**: Instead of storing "what is", we store "what happened"
+
+### Traditional Approach (State-Based)
+```
+Database Table: Tanks
+- ID: 123
+- Name: "Tank A"
+- Status: "Active"
+- Capacity: 100L
+```
+
+### Event Sourcing Approach
+```
+Event Store:
+- Event 1: TankCreated (ID: 123, Name: "Tank A", Capacity: 100L)
+- Event 2: TankActivated (ID: 123)
+- Event 3: TankNameChanged (ID: 123, NewName: "Tank A Updated")
+```
+
+**To get current state**: Replay all events from the beginning
+
+---
+
+## 2. Why Event Sourcing?
+
+### Benefits
+
+**1. Complete Audit Trail**:
+- Every change is recorded
+- Know exactly what happened and when
+- Can reconstruct state at any point in time
+
+**2. Time Travel**:
+- See what the state was yesterday, last week, last year
+- Debug issues by replaying events
+- Analyze historical patterns
+
+**3. Event-Driven Architecture**:
+- Events can trigger other actions
+- Multiple systems can react to events
+- Decoupled architecture
+
+**4. No Data Loss**:
+- Events are append-only
+- Can't accidentally delete history
+- Rebuild state from events
+
+### Trade-offs
+
+**Complexity**:
+- More complex than traditional CRUD
+- Need to handle event replay
+- Need snapshots for performance
+
+**Storage**:
+- Can grow large over time
+- Need snapshot strategy
+- Event versioning challenges
+
+---
+
+## 3. Event Store
+
+### What is an Event Store?
+
+**Event Store** is a database optimized for storing events:
+- Append-only (events are never modified)
+- Ordered by version
+- Fast event retrieval
+- Supports snapshots
+
+### Event Store Structure
+
+```
+Events Table:
+- Id (Guid)
+- AggregateId (Guid) - Which aggregate this event belongs to
+- EventType (string) - Type of event
+- EventData (JSON) - Serialized event data
+- Metadata (JSON) - Additional metadata
+- Version (long) - Event version (sequence number)
+- Timestamp (DateTime) - When event occurred
+
+Snapshots Table:
+- Id (Guid)
+- AggregateId (Guid)
+- AggregateType (string)
+- Data (JSON) - Serialized aggregate state
+- Version (long) - Snapshot version
+- Timestamp (DateTime)
+```
+
+---
+
+## 4. How Event Sourcing Works
+
+### Saving Events
+
+```
+1. Aggregate changes state
+   └─> tank.Activate()
+   
+2. Aggregate raises domain event
+   └─> Apply(new TankActivatedEvent(Id))
+   
+3. Repository collects events
+   └─> var events = tank.DomainEvents
+   
+4. Event Store saves events
+   └─> await eventStore.SaveEventsAsync(aggregateId, events, expectedVersion)
+   
+5. Events are serialized and stored
+   └─> JSON serialization
+   └─> Append to Events table
+```
+
+### Loading Aggregates
+
+```
+1. Load snapshot (if exists)
+   └─> var snapshot = await eventStore.GetSnapshotAsync<Tank>(id)
+   └─> fromVersion = snapshot?.Version ?? 0
+   
+2. Load events since snapshot
+   └─> var events = await eventStore.GetEventsAsync(id, fromVersion)
+   
+3. Replay events to rebuild state
+   └─> foreach (var event in events)
+       └─> ApplyEventToAggregate(tank, event)
+   
+4. Return reconstructed aggregate
+```
+
+---
+
+## 5. Snapshots
+
+### Why Snapshots?
+
+**Problem**: Loading aggregates with many events is slow
+- 1000 events = slow replay
+- 10,000 events = very slow
+- 100,000 events = too slow
+
+**Solution**: Snapshots
+- Save complete aggregate state periodically
+- Load snapshot + events since snapshot
+- Much faster loading
+
+### Snapshot Strategy
+
+**When to Create Snapshots**:
+- Every N events (e.g., every 100 events)
+- After significant state changes
+- Periodically (e.g., daily)
+
+**Example**:
+```
+Aggregate has 500 events
+- Snapshot at version 400
+- Load snapshot (version 400)
+- Load events 401-500 (only 100 events)
+- Much faster than loading all 500 events
+```
+
+---
+
+## 6. Concurrency Control
+
+### Optimistic Concurrency
+
+**Problem**: Two users modify same aggregate simultaneously
+
+**Solution**: Version checking
+```
+User A: Loads tank (Version = 5)
+User B: Loads tank (Version = 5)
+
+User A: Modifies tank → Version becomes 6
+User B: Tries to save → Expected version 5, but current is 6
+       → CONCURRENCY CONFLICT!
+       → User B must reload and retry
+```
+
+**Implementation**:
+```csharp
+// Save events with expected version
+await eventStore.SaveEventsAsync(
+    aggregateId, 
+    events, 
+    expectedVersion);  // ← Checks this matches current version
+
+// If version mismatch → throw exception
+```
+
+---
+
+## 7. Event Replay
+
+### How to Rebuild State from Events
+
+**Simple Approach** (Reflection):
+```csharp
+foreach (var domainEvent in events)
+{
+    // Use reflection to find and call Apply method
+    var method = aggregate.GetType()
+        .GetMethod("Apply", new[] { domainEvent.GetType() });
+    
+    method?.Invoke(aggregate, new[] { domainEvent });
+}
+```
+
+**Better Approach** (Event Handlers):
+```csharp
+// Each event type has a handler
+switch (domainEvent)
+{
+    case TankCreatedEvent e:
+        tank = Tank.Create(e.Name, e.Capacity, e.Location, e.TankType);
+        break;
+    case TankActivatedEvent e:
+        tank.Status = TankStatus.Active;
+        break;
+    // ... other events
+}
+```
+
+---
+
+## 8. Event Versioning
+
+### The Challenge
+
+**Problem**: Event structure changes over time
+- Version 1: TankCreatedEvent(Name, Capacity)
+- Version 2: TankCreatedEvent(Name, Capacity, Location) ← Added field
+
+**Solutions**:
+
+**1. Upcasting**:
+- Convert old event format to new format
+- Handle missing fields with defaults
+
+**2. Event Versioning**:
+- Store event version in metadata
+- Handle different versions differently
+
+**3. Never Change Events**:
+- Create new event types instead
+- Keep old events unchanged
+
+---
+
+## 9. Real-World Analogy
+
+Think of **Event Sourcing** like a **bank account statement**:
+
+**Traditional (State-Based)**:
+- Just shows current balance: $1000
+- Don't know how you got there
+
+**Event Sourcing**:
+- Shows all transactions:
+  - Deposit: +$500
+  - Withdrawal: -$200
+  - Deposit: +$700
+- Current balance: $1000 (calculated from events)
+- Can see history, audit trail, reconstruct any point in time
+
+**Key Points**:
+- Events are immutable (can't change past transactions)
+- Append-only (new transactions added, never deleted)
+- Complete history (every transaction recorded)
+- Reconstruct state (balance = sum of all transactions)
+
+---
+
+## 10. Benefits Summary
+
+**Event Sourcing Provides**:
+
+1. **Complete Audit Trail**: Every change is recorded
+2. **Time Travel**: See state at any point in time
+3. **Event-Driven**: Events can trigger other actions
+4. **No Data Loss**: Events are append-only
+5. **Debugging**: Replay events to find issues
+6. **Analytics**: Analyze event patterns
+7. **Compliance**: Complete history for regulations
+
+**Trade-offs**:
+- More complex than traditional CRUD
+- Need snapshot strategy for performance
+- Event versioning challenges
+- Storage can grow large
+
+---
+
+## 11. Summary
+
+**Event Sourcing**:
+- Stores events instead of current state
+- Rebuilds state by replaying events
+- Provides complete audit trail
+- Enables time travel and event-driven architecture
+
+**Key Components**:
+- Event Store (database for events)
+- Snapshots (for performance)
+- Event Replay (rebuild state)
+- Concurrency Control (version checking)
+
+**Key Takeaway**: Event Sourcing is powerful for systems that need complete history, audit trails, and event-driven architecture. It's more complex than traditional CRUD, but provides significant benefits for the right use cases.
+
