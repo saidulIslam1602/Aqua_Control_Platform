@@ -13,9 +13,16 @@ The **Domain**, **Application**, **Infrastructure**, **Frontend**, and **Data En
                │ HTTP/WebSocket
                ▼
 ┌─────────────────────────────────────┐
+│    API/Presentation Layer           │
+│  (REST Controllers, SignalR Hubs)    │
+│  (Middleware, Error Handling)       │
+└──────────────┬──────────────────────┘
+               │ MediatR (Commands/Queries)
+               ▼
+┌─────────────────────────────────────┐
 │      Application Layer              │
 │  (Orchestration & Use Cases)        │
-│  (API Endpoints)                    │
+│  (Handlers, DTOs, Validation)        │
 └──────────────┬──────────────────────┘
                │ uses
                ▼
@@ -91,16 +98,38 @@ The **Domain**, **Application**, **Infrastructure**, **Frontend**, and **Data En
 - Implements use cases
 - Maps between DTOs and domain models
 - Defines interfaces for Infrastructure
-- Exposes API endpoints (REST/GraphQL)
-- Handles HTTP requests
+- Contains command/query handlers (CQRS)
+- Handles validation and business coordination
 
 **What It Doesn't Do**:
 - Contain business rules (belongs in Domain)
 - Directly access databases (uses repositories)
 - Know about UI frameworks (belongs in Frontend)
 - Implement persistence (belongs in Infrastructure)
+- Handle HTTP requests (belongs in API/Presentation)
 
 **Key Principle**: Use case orchestration, defines what Infrastructure should provide
+
+### API/Presentation Layer (Entry Point)
+
+**What It Does**:
+- Handles HTTP requests (REST API)
+- Handles WebSocket connections (SignalR)
+- Exposes API endpoints (REST/GraphQL)
+- Transforms HTTP requests to commands/queries
+- Transforms Application results to HTTP responses
+- Provides API documentation (Swagger)
+- Handles authentication and authorization
+- Global error handling and logging
+- Health checks and monitoring
+
+**What It Doesn't Do**:
+- Contain business rules (belongs in Domain)
+- Contain use case logic (belongs in Application)
+- Know about database structure (uses Application layer)
+- Make direct database calls (uses Application layer via MediatR)
+
+**Key Principle**: Thin entry point layer that delegates to Application layer, handles protocol-specific concerns
 
 ### Infrastructure Layer (Implementation)
 
@@ -147,10 +176,15 @@ The **Domain**, **Application**, **Infrastructure**, **Frontend**, and **Data En
 ```
 Frontend Layer
     │
-    │ HTTP/WebSocket (API)
+    │ HTTP/WebSocket
     │ depends on
     ▼
-Application Layer (API)
+API/Presentation Layer
+    │
+    │ MediatR (Commands/Queries)
+    │ depends on
+    ▼
+Application Layer
     │
     │ uses
     │ depends on
@@ -249,12 +283,13 @@ Data Engineering Layer
                     │ HTTP POST /api/tanks
                     ▼
 ┌─────────────────────────────────────────────────────────────┐
-│ 3. Backend: Application Layer (API Controller)            │
-│    - Receives HTTP POST /api/tanks                         │
-│    - Creates CreateTankCommand                             │
+│ 3. Backend: API/Presentation Layer (Controller)          │
+│    - TanksController.CreateTank() receives request        │
+│    - Creates CreateTankCommand from request                │
 │    - Sends to MediatR                                      │
 └──────────────────┬──────────────────────────────────────────┘
                     │
+                    │ MediatR
                     ▼
 ┌─────────────────────────────────────────────────────────────┐
 │ 4. Backend: Application Layer (MediatR)                   │
@@ -266,6 +301,7 @@ Data Engineering Layer
                     ▼
 ┌─────────────────────────────────────────────────────────────┐
 │ 5. Backend: Application Layer (Handler)                   │
+│    - CreateTankCommandHandler.Handle()                     │
 │    - Checks if tank exists (via ITankRepository)          │
 │      └─> Infrastructure: Queries Read Model               │
 │    - Creates Domain value objects                          │
@@ -300,24 +336,33 @@ Data Engineering Layer
                     ▼
 ┌─────────────────────────────────────────────────────────────┐
 │ 8. Backend: Infrastructure Layer (SignalR)                │
-│    - Publishes TankCreatedEvent to connected clients       │
+│    - ISignalRService publishes TankCreatedEvent            │
+│    - TankDataHub broadcasts to connected clients          │
 │    - Real-time update sent to Frontend                     │
 └──────────────────┬──────────────────────────────────────────┘
                     │
                     │ HTTP 201 Created + Tank Data
                     ▼
 ┌─────────────────────────────────────────────────────────────┐
-│ 9. Frontend Layer (Response Handling)                      │
-│    - HttpClient receives response                          │
-│    - TankService returns created tank                      │
-│    - TankStore replaces optimistic tank with real tank     │
-│    - Notification shown to user                            │
+│ 9. Backend: API/Presentation Layer (Response)            │
+│    - TanksController returns HTTP 201 Created             │
+│    - Includes location header and tank data                │
+└──────────────────┬──────────────────────────────────────────┘
+                    │
+                    │ HTTP Response
+                    ▼
+┌─────────────────────────────────────────────────────────────┐
+│ 10. Frontend Layer (Response Handling)                     │
+│     - HttpClient receives response                          │
+│     - TankService returns created tank                      │
+│     - TankStore replaces optimistic tank with real tank     │
+│     - Notification shown to user                            │
 └──────────────────┬──────────────────────────────────────────┘
                     │
                     │ SignalR Event
                     ▼
 ┌─────────────────────────────────────────────────────────────┐
-│ 10. Frontend Layer (Real-time Update)                     │
+│ 11. Frontend Layer (Real-time Update)                     │
 │     - RealTimeStore receives TankCreatedEvent              │
 │     - TankStore updates UI with real-time data            │
 │     - UI automatically reflects changes                     │
@@ -326,7 +371,7 @@ Data Engineering Layer
                     │ Domain Events (Kafka)
                     ▼
 ┌─────────────────────────────────────────────────────────────┐
-│ 11. Data Engineering Layer (Event Consumption)            │
+│ 12. Data Engineering Layer (Event Consumption)            │
 │     - Kafka receives TankCreatedEvent                      │
 │     - Kafka Streams processes event                        │
 │     - Updates TimescaleDB time-series data                 │
@@ -530,11 +575,18 @@ Think of **Four-Layer Architecture** like a **restaurant with delivery**:
 - Defines interfaces
 - Raises domain events
 
+**API/Presentation Layer**:
+- Handles HTTP requests (REST API)
+- Handles WebSocket connections (SignalR)
+- Transforms HTTP ↔ Application layer
+- Provides API documentation
+- Global error handling and logging
+
 **Application Layer**:
 - Orchestrates domain operations
 - Implements use cases
-- Exposes APIs for Frontend
-- Publishes domain events
+- Contains command/query handlers (CQRS)
+- Maps between DTOs and domain models
 
 **Infrastructure Layer**:
 - Implements data persistence
@@ -552,5 +604,5 @@ Think of **Four-Layer Architecture** like a **restaurant with delivery**:
 - ML feature engineering
 - Analytics and predictions
 
-**Key Takeaway**: The complete architecture provides separation of concerns with a main application stack (Frontend, Application, Domain, Infrastructure) and a parallel data engineering layer for analytics and ML. The main stack follows Clean Architecture with dependencies flowing inward toward Domain. Infrastructure layer includes both application infrastructure (Event Store, Read Models, repositories) and cloud infrastructure (AWS EKS, RDS, ElastiCache, S3) deployed via Infrastructure as Code (Terraform). Data Engineering consumes events asynchronously, enabling real-time analytics and ML without affecting the main application flow. This creates a robust, scalable, and maintainable full-stack system with advanced analytics capabilities and enterprise-grade cloud infrastructure.
+**Key Takeaway**: The complete architecture provides separation of concerns with a main application stack (Frontend, API/Presentation, Application, Domain, Infrastructure) and a parallel data engineering layer for analytics and ML. The main stack follows Clean Architecture with dependencies flowing inward toward Domain. The API/Presentation layer is a thin entry point that handles HTTP and WebSocket protocols, delegates to the Application layer via MediatR, and provides consistent error handling and logging. The Application layer orchestrates use cases using CQRS patterns. Infrastructure layer includes both application infrastructure (Event Store, Read Models, repositories) and cloud infrastructure (AWS EKS, RDS, ElastiCache, S3) deployed via Infrastructure as Code (Terraform). Data Engineering consumes events asynchronously, enabling real-time analytics and ML without affecting the main application flow. This creates a robust, scalable, and maintainable full-stack system with advanced analytics capabilities and enterprise-grade cloud infrastructure.
 

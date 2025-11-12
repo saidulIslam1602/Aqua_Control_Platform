@@ -248,9 +248,9 @@ public sealed class TankCapacity : ValueObject
    └─> HTTP POST /api/tanks
    └─> HttpClient sends request
 
-3. Backend: Application Layer (API Controller)
-   └─> Receives HTTP POST /api/tanks
-   └─> Creates CreateTankCommand
+3. Backend: API/Presentation Layer (Controller)
+   └─> TanksController.CreateTank() receives HTTP POST /api/tanks
+   └─> Creates CreateTankCommand from request
    └─> Sends to MediatR
 
 4. Backend: Application Layer (MediatR)
@@ -298,26 +298,44 @@ public sealed class TankCapacity : ValueObject
     └─> Logs, sends notifications, etc.
 
 11. Backend: Infrastructure Layer (SignalR)
-    └─> Publishes TankCreatedEvent to connected clients
+    └─> ISignalRService publishes TankCreatedEvent
+    └─> TankDataHub broadcasts to connected clients
 
-12. Frontend Layer
+12. Backend: API/Presentation Layer (Response)
+    └─> TanksController returns HTTP 201 Created
+    └─> Includes location header and tank data
+
+13. Frontend Layer (Response)
+    └─> HttpClient receives HTTP 201 Created
+    └─> TankService returns created tank
+    └─> TankStore replaces optimistic tank with real tank
+
+14. Frontend Layer (Real-time Update)
     └─> RealTimeStore receives TankCreatedEvent
-    └─> TankStore updates UI
-    └─> Returns HTTP 201 Created with tank ID
+    └─> TankStore updates UI with real-time data
 ```
 
 ### Query Flow (Read Operation) - All Layers
 
 ```
-1. Presentation Layer
+1. Frontend Layer
+   └─> User navigates to tank list page
+   └─> Calls tankStore.fetchTanks()
+
+2. Frontend Layer (Service)
    └─> HTTP GET /api/tanks?page=1
-   └─> Creates GetTanksQuery
+   └─> HttpClient sends request
+
+3. Backend: API/Presentation Layer (Controller)
+   └─> TanksController.GetTanks() receives HTTP GET /api/tanks
+   └─> Creates GetTanksQuery from query parameters
    └─> Sends to MediatR
 
-2. Application Layer (MediatR)
+4. Backend: Application Layer (MediatR)
    └─> Routes to GetTanksQueryHandler
 
-3. Application Layer (Handler)
+5. Backend: Application Layer (Handler)
+   └─> GetTanksQueryHandler.Handle()
    └─> Builds specification (filter)
    └─> Queries repository (via ITankRepository interface)
        └─> Infrastructure: TankRepository.GetPagedAsync()
@@ -327,8 +345,15 @@ public sealed class TankCapacity : ValueObject
    └─> Maps Domain to DTOs
    └─> Returns PagedResult<TankDto>
 
-4. Presentation Layer
-   └─> Returns HTTP 200 OK with JSON data
+6. Backend: API/Presentation Layer (Response)
+   └─> TanksController returns HTTP 200 OK
+   └─> Includes JSON data (PagedResult<TankDto>)
+
+7. Frontend Layer
+   └─> HttpClient receives HTTP 200 OK
+   └─> TankService returns tank list
+   └─> TankStore updates state
+   └─> UI renders tank list
 ```
 
 ---
@@ -543,21 +568,27 @@ Think of **Domain and Application** like a **construction project**:
 
 **How All Layers Work Together**:
 
-1. **Application Orchestrates**:
-   - Receives requests
+1. **API/Presentation Receives**:
+   - Handles HTTP requests (REST API)
+   - Handles WebSocket connections (SignalR)
+   - Transforms HTTP ↔ Application layer
+   - Provides API documentation
+   - Global error handling and logging
+
+2. **Application Orchestrates**:
+   - Receives commands/queries from API layer
    - Coordinates operations
    - Calls Domain methods
    - Uses Infrastructure via interfaces
-   - Exposes APIs for Frontend
 
-2. **Domain Executes**:
+3. **Domain Executes**:
    - Validates business rules
    - Enforces invariants
    - Changes state
    - Raises events
    - Defines interfaces
 
-3. **Infrastructure Provides**:
+4. **Infrastructure Provides**:
    - Implements data persistence
    - Provides external services
    - Implements Domain and Application interfaces
@@ -568,35 +599,37 @@ Think of **Domain and Application** like a **construction project**:
    - Container orchestration (Kubernetes)
    - Monitoring and observability (CloudWatch, Prometheus, Grafana)
 
-4. **Frontend Provides**:
+5. **Frontend Provides**:
    - User interface and experience
    - Client-side state management
    - Communicates with backend via API
    - Real-time updates via SignalR
 
-5. **Data Engineering Analyzes**:
+6. **Data Engineering Analyzes**:
    - Consumes domain events (via Kafka)
    - Processes events in real-time
    - Stores time-series data
    - Engineers ML features
    - Provides analytics and predictions
 
-6. **Communication Mechanisms**:
+7. **Communication Mechanisms**:
+   - HTTP/WebSocket (Frontend → API/Presentation)
+   - MediatR (API/Presentation → Application)
    - Direct method calls (Application → Domain)
    - Interface calls (Application → Infrastructure)
-   - HTTP/WebSocket (Frontend → Backend API)
    - Domain events (Domain → Infrastructure → Kafka → Data Engineering)
    - Real-time events (Infrastructure → SignalR → Frontend)
    - Value objects (validation at Domain level)
 
-7. **Clear Responsibilities**:
+8. **Clear Responsibilities**:
+   - API/Presentation: HTTP/WebSocket handling, request/response transformation, error handling
    - Domain: Business logic and interfaces
-   - Application: Use cases, orchestration, and APIs
+   - Application: Use cases, orchestration, command/query handlers
    - Infrastructure: Persistence, external services, event publishing, cloud deployment
    - Frontend: User interface and client state
    - Data Engineering: Analytics, ML features, time-series processing
 
-8. **Infrastructure Deployment (AWS DevOps)**:
+9. **Infrastructure Deployment (AWS DevOps)**:
    - Infrastructure as Code (Terraform) for reproducible deployments
    - EKS cluster for container orchestration
    - RDS PostgreSQL with TimescaleDB for time-series data
@@ -606,5 +639,5 @@ Think of **Domain and Application** like a **construction project**:
    - CloudWatch, Prometheus, and Grafana for monitoring
    - Multi-environment support (dev, staging, prod)
 
-**Key Takeaway**: Application layer is the conductor, Domain layer is the orchestra, Infrastructure layer is the stage crew, Frontend layer is the audience, and Data Engineering layer is the recording studio. Application orchestrates and coordinates, Domain performs the business logic, Infrastructure provides the technical foundation and publishes events, Frontend provides the user experience, and Data Engineering analyzes events for analytics and ML. They work together seamlessly, with clear boundaries and responsibilities, to implement a complete, production-ready system with advanced analytics capabilities.
+**Key Takeaway**: API/Presentation layer is the entry point, Application layer is the conductor, Domain layer is the orchestra, Infrastructure layer is the stage crew, Frontend layer is the audience, and Data Engineering layer is the recording studio. API/Presentation handles HTTP and WebSocket protocols and delegates to Application, Application orchestrates and coordinates, Domain performs the business logic, Infrastructure provides the technical foundation and publishes events, Frontend provides the user experience, and Data Engineering analyzes events for analytics and ML. They work together seamlessly, with clear boundaries and responsibilities, to implement a complete, production-ready system with advanced analytics capabilities.
 

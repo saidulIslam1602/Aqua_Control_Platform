@@ -30,6 +30,16 @@ Outer Layers → Inner Layers
                │ depends on
                ▼
 ┌─────────────────────────────────────┐
+│   API/Presentation Layer            │
+│   - REST Controllers                │
+│   - SignalR Hubs                    │
+│   - Middleware                       │
+│   - Service Extensions               │
+└──────────────┬──────────────────────┘
+               │ MediatR (Commands/Queries)
+               │ depends on
+               ▼
+┌─────────────────────────────────────┐
 │   Application Layer                  │
 │   - Commands                         │
 │   - Queries                          │
@@ -97,7 +107,8 @@ Outer Layers → Inner Layers
 ### The Rule in Practice
 
 ```
-✅ Frontend → Backend API (Application layer) (OK)
+✅ Frontend → API/Presentation Layer (OK)
+✅ API/Presentation → Application Layer (OK)
 ✅ Application → Domain (OK)
 ✅ Infrastructure → Domain (OK, implements Domain interfaces)
 ✅ Infrastructure → Application (OK, implements Application interfaces)

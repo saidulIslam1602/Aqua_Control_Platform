@@ -1,0 +1,556 @@
+# Theoretical Concepts: API/Presentation Layer
+
+## 1. What is the API/Presentation Layer?
+
+The **API/Presentation Layer** is the entry point of the backend application. It handles HTTP requests, WebSocket connections, and exposes the application's functionality to external clients (frontend, mobile apps, third-party integrations).
+
+**Key Principle**: 
+- **Thin layer** that delegates to Application layer
+- **No business logic** - only request/response handling
+- **Protocol-specific** - handles HTTP, WebSocket, GraphQL
+- **Transforms** between HTTP and Application layer (commands/queries)
+
+### API Layer Responsibilities
+
+**✅ API Layer Should**:
+- Receive HTTP requests (REST API)
+- Handle WebSocket connections (SignalR)
+- Validate request format (input validation)
+- Transform HTTP requests to commands/queries
+- Transform Application results to HTTP responses
+- Handle authentication and authorization
+- Provide API documentation (Swagger)
+- Handle cross-cutting concerns (logging, error handling)
+- Manage CORS policies
+- Provide health check endpoints
+
+**❌ API Layer Should NOT**:
+- Contain business rules (belongs in Domain)
+- Contain use case logic (belongs in Application)
+- Know about database structure (uses Application layer)
+- Make direct database calls (uses Application layer via MediatR)
+
+---
+
+## 2. API Layer Architecture
+
+### Layer Structure
+
+```
+┌─────────────────────────────────────┐
+│      API/Presentation Layer         │
+│  ┌─────────────┐  ┌──────────────┐  │
+│  │ Controllers │  │ SignalR Hubs │  │
+│  └──────┬──────┘  └──────┬───────┘  │
+│         │                │           │
+│  ┌──────▼────────────────▼───────┐  │
+│  │      Middleware                │  │
+│  │  - Exception Handling         │  │
+│  │  - Request Logging            │  │
+│  │  - Authentication             │  │
+│  └───────────────────────────────┘  │
+└──────────────┬──────────────────────┘
+               │
+               │ MediatR (Commands/Queries)
+               ▼
+┌─────────────────────────────────────┐
+│      Application Layer              │
+│  (Handlers, DTOs, Business Logic)   │
+└─────────────────────────────────────┘
+```
+
+### Components
+
+**1. Controllers (REST API)**
+- Handle HTTP requests (GET, POST, PUT, DELETE)
+- Create commands/queries from requests
+- Send to MediatR
+- Return HTTP responses
+
+**2. SignalR Hubs (Real-time)**
+- Handle WebSocket connections
+- Manage client groups
+- Broadcast real-time updates
+- Handle connection lifecycle
+
+**3. Middleware**
+- Exception handling (global error handling)
+- Request logging (audit trail)
+- Authentication/Authorization
+- CORS handling
+
+**4. Service Extensions**
+- Swagger configuration
+- Authentication setup
+- CORS policies
+- Health checks
+- SignalR services
+
+---
+
+## 3. REST API Controllers
+
+### Controller Pattern
+
+```csharp
+[ApiController]
+[Route("api/[controller]")]
+[Authorize]
+public class TanksController : ControllerBase
+{
+    private readonly IMediator _mediator;
+    
+    [HttpGet]
+    public async Task<ActionResult<PagedResult<TankDto>>> GetTanks(
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 10)
+    {
+        // 1. Create query from HTTP request
+        var query = new GetTanksQuery(page, pageSize);
+        
+        // 2. Send to Application layer via MediatR
+        var result = await _mediator.Send(query);
+        
+        // 3. Transform Application result to HTTP response
+        if (result.IsFailure)
+            return BadRequest(result.Error);
+        
+        return Ok(result.Value);
+    }
+}
+```
+
+### Key Characteristics
+
+**Thin Controllers**:
+- Controllers are thin - they only handle HTTP concerns
+- Business logic is in Application layer (handlers)
+- Controllers delegate to MediatR
+
+**Request/Response Transformation**:
+- HTTP request → Command/Query
+- Application Result → HTTP response
+- DTOs for request/response models
+
+**Error Handling**:
+- Use Result pattern from Application layer
+- Map Result errors to HTTP status codes
+- Consistent error responses
+
+---
+
+## 4. SignalR Hubs (Real-time Communication)
+
+### Hub Pattern
+
+```csharp
+[Authorize]
+public class TankDataHub : Hub
+{
+    public async Task JoinTankGroup(string tankId)
+    {
+        await Groups.AddToGroupAsync(Context.ConnectionId, $"Tank_{tankId}");
+    }
+    
+    public async Task LeaveTankGroup(string tankId)
+    {
+        await Groups.RemoveFromGroupAsync(Context.ConnectionId, $"Tank_{tankId}");
+    }
+}
+```
+
+### SignalR Service
+
+```csharp
+public interface ISignalRService
+{
+    Task SendTankUpdateAsync(string tankId, object data);
+    Task SendSensorReadingAsync(string tankId, object reading);
+    Task SendAlertAsync(string tankId, object alert);
+}
+
+public class SignalRService : ISignalRService
+{
+    private readonly IHubContext<TankDataHub> _hubContext;
+    
+    public async Task SendTankUpdateAsync(string tankId, object data)
+    {
+        await _hubContext.Clients.Group($"Tank_{tankId}")
+            .SendAsync("TankUpdated", data);
+    }
+}
+```
+
+### Key Characteristics
+
+**Group Management**:
+- Clients join groups for specific tanks
+- Broadcast updates to specific groups
+- Manage connection lifecycle
+
+**Real-time Updates**:
+- Domain events trigger SignalR notifications
+- Infrastructure layer publishes to SignalR
+- Frontend receives real-time updates
+
+**Authentication**:
+- SignalR hubs require authentication
+- JWT tokens passed via query string or headers
+- User context available in hub methods
+
+---
+
+## 5. Middleware
+
+### Exception Handling Middleware
+
+```csharp
+public class ExceptionHandlingMiddleware
+{
+    private readonly RequestDelegate _next;
+    
+    public async Task InvokeAsync(HttpContext context)
+    {
+        try
+        {
+            await _next(context);
+        }
+        catch (Exception ex)
+        {
+            await HandleExceptionAsync(context, ex);
+        }
+    }
+    
+    private static async Task HandleExceptionAsync(
+        HttpContext context, 
+        Exception exception)
+    {
+        var (statusCode, error) = exception switch
+        {
+            ArgumentException => (HttpStatusCode.BadRequest, 
+                Error.Validation("Validation.Failed", exception.Message)),
+            KeyNotFoundException => (HttpStatusCode.NotFound, 
+                Error.NotFound("Resource.NotFound", "Resource not found")),
+            _ => (HttpStatusCode.InternalServerError, 
+                Error.Failure("Server.InternalError", "Internal error"))
+        };
+        
+        context.Response.StatusCode = (int)statusCode;
+        // Return standardized error response
+    }
+}
+```
+
+### Request Logging Middleware
+
+```csharp
+public class RequestLoggingMiddleware
+{
+    private readonly RequestDelegate _next;
+    private readonly ILogger<RequestLoggingMiddleware> _logger;
+    
+    public async Task InvokeAsync(HttpContext context)
+    {
+        var startTime = DateTime.UtcNow;
+        
+        await _next(context);
+        
+        var duration = DateTime.UtcNow - startTime;
+        _logger.LogInformation(
+            "Request {Method} {Path} completed in {Duration}ms with status {StatusCode}",
+            context.Request.Method,
+            context.Request.Path,
+            duration.TotalMilliseconds,
+            context.Response.StatusCode);
+    }
+}
+```
+
+### Key Characteristics
+
+**Global Exception Handling**:
+- Catches all unhandled exceptions
+- Converts exceptions to standardized error responses
+- Logs exceptions for debugging
+
+**Request Logging**:
+- Logs all incoming requests
+- Tracks request duration
+- Records response status codes
+- Provides audit trail
+
+**Middleware Order**:
+- Exception handling first (catches all errors)
+- Request logging early (tracks all requests)
+- Authentication/Authorization before controllers
+- CORS before authentication
+
+---
+
+## 6. Service Configuration
+
+### Swagger Documentation
+
+```csharp
+public static IServiceCollection AddSwaggerDocumentation(
+    this IServiceCollection services)
+{
+    services.AddSwaggerGen(c =>
+    {
+        c.SwaggerDoc("v1", new OpenApiInfo
+        {
+            Title = "AquaControl API",
+            Version = "v1"
+        });
+        
+        // Add JWT authentication to Swagger
+        c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
+        {
+            Type = SecuritySchemeType.Http,
+            Scheme = "bearer",
+            BearerFormat = "JWT"
+        });
+    });
+    
+    return services;
+}
+```
+
+### Authentication Configuration
+
+```csharp
+public static IServiceCollection AddAuthenticationServices(
+    this IServiceCollection services,
+    IConfiguration configuration)
+{
+    services.AddAuthentication(options =>
+    {
+        options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+        options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+    })
+    .AddJwtBearer(options =>
+    {
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer = true,
+            ValidateAudience = true,
+            ValidateLifetime = true,
+            ValidateIssuerSigningKey = true,
+            // ... JWT configuration
+        };
+        
+        // SignalR JWT support
+        options.Events = new JwtBearerEvents
+        {
+            OnMessageReceived = context =>
+            {
+                var accessToken = context.Request.Query["access_token"];
+                if (!string.IsNullOrEmpty(accessToken))
+                {
+                    context.Token = accessToken;
+                }
+                return Task.CompletedTask;
+            }
+        };
+    });
+    
+    return services;
+}
+```
+
+### Health Checks
+
+```csharp
+public static IServiceCollection AddHealthCheckServices(
+    this IServiceCollection services,
+    IConfiguration configuration)
+{
+    services.AddHealthChecks()
+        .AddNpgSql(configuration.GetConnectionString("DefaultConnection")!)
+        .AddRedis(configuration.GetConnectionString("Redis")!);
+    
+    return services;
+}
+```
+
+---
+
+## 7. Request Flow
+
+### Complete Request Flow
+
+```
+1. HTTP Request
+   └─> Client sends HTTP POST /api/tanks
+
+2. Middleware Pipeline
+   └─> RequestLoggingMiddleware (logs request)
+   └─> ExceptionHandlingMiddleware (catches errors)
+   └─> AuthenticationMiddleware (validates JWT)
+   └─> AuthorizationMiddleware (checks permissions)
+
+3. Controller
+   └─> TanksController.CreateTank()
+   └─> Creates CreateTankCommand from request
+   └─> Sends to MediatR
+
+4. Application Layer
+   └─> CreateTankCommandHandler
+   └─> Validates command
+   └─> Calls Domain layer
+   └─> Saves via Infrastructure
+   └─> Returns Result<Guid>
+
+5. Controller Response
+   └─> Transforms Result to HTTP response
+   └─> Returns HTTP 201 Created with tank ID
+
+6. Middleware Pipeline (Response)
+   └─> RequestLoggingMiddleware (logs response)
+   └─> ExceptionHandlingMiddleware (handles errors if any)
+
+7. HTTP Response
+   └─> Client receives HTTP 201 Created
+```
+
+---
+
+## 8. Real-time Flow
+
+### SignalR Real-time Update Flow
+
+```
+1. Domain Event
+   └─> Tank.Activate() raises TankActivatedEvent
+
+2. Infrastructure Layer
+   └─> UnitOfWork publishes event
+   └─> Event handler receives event
+
+3. SignalR Service
+   └─> ISignalRService.SendTankUpdateAsync()
+   └─> Publishes to SignalR hub
+
+4. SignalR Hub
+   └─> TankDataHub broadcasts to group
+   └─> Sends "TankUpdated" message
+
+5. Frontend
+   └─> RealTimeStore receives update
+   └─> TankStore updates state
+   └─> UI automatically reflects changes
+```
+
+---
+
+## 9. Best Practices
+
+### 1. Keep Controllers Thin
+
+**✅ Good**:
+```csharp
+[HttpPost]
+public async Task<ActionResult<TankDto>> CreateTank(
+    [FromBody] CreateTankRequest request)
+{
+    var command = new CreateTankCommand(...);
+    var result = await _mediator.Send(command);
+    
+    if (result.IsFailure)
+        return BadRequest(result.Error);
+    
+    return CreatedAtAction(nameof(GetTankById), 
+        new { id = result.Value }, 
+        await GetTankById(result.Value));
+}
+```
+
+**❌ Bad**:
+```csharp
+[HttpPost]
+public async Task<ActionResult<TankDto>> CreateTank(
+    [FromBody] CreateTankRequest request)
+{
+    // Business logic in controller - WRONG!
+    if (string.IsNullOrEmpty(request.Name))
+        return BadRequest("Name required");
+    
+    var tank = new Tank(...); // Domain logic in controller - WRONG!
+    await _repository.AddAsync(tank); // Direct repository access - WRONG!
+    
+    return Ok(tank);
+}
+```
+
+### 2. Use Result Pattern
+
+**✅ Good**:
+```csharp
+var result = await _mediator.Send(command);
+
+if (result.IsFailure)
+    return result.Error.Type switch
+    {
+        ErrorType.NotFound => NotFound(result.Error),
+        ErrorType.Validation => BadRequest(result.Error),
+        _ => BadRequest(result.Error)
+    };
+
+return Ok(result.Value);
+```
+
+### 3. Consistent Error Responses
+
+**✅ Good**:
+```csharp
+// Standardized error response
+{
+    "code": "Tank.NotFound",
+    "description": "Tank with ID {id} was not found",
+    "type": "NotFound",
+    "timestamp": "2024-01-01T00:00:00Z",
+    "path": "/api/tanks/123"
+}
+```
+
+### 4. Proper HTTP Status Codes
+
+- `200 OK` - Successful GET, PUT, PATCH
+- `201 Created` - Successful POST (resource created)
+- `204 No Content` - Successful DELETE
+- `400 Bad Request` - Validation errors
+- `401 Unauthorized` - Authentication required
+- `403 Forbidden` - Authorization failed
+- `404 Not Found` - Resource not found
+- `500 Internal Server Error` - Server errors
+
+---
+
+## 10. Summary
+
+**API/Presentation Layer**:
+
+**Responsibilities**:
+- Handle HTTP requests (REST API)
+- Handle WebSocket connections (SignalR)
+- Transform HTTP ↔ Application layer
+- Provide API documentation
+- Handle authentication/authorization
+- Global error handling and logging
+- Health checks and monitoring
+
+**Key Components**:
+- **Controllers**: REST API endpoints
+- **SignalR Hubs**: Real-time communication
+- **Middleware**: Cross-cutting concerns
+- **Service Extensions**: Configuration
+
+**Key Principles**:
+- Thin layer (delegates to Application)
+- No business logic
+- Protocol-specific handling
+- Consistent error responses
+- Proper HTTP status codes
+
+**Key Takeaway**: The API/Presentation layer is the entry point of the backend application. It handles HTTP and WebSocket protocols, transforms requests to commands/queries, and delegates all business logic to the Application layer. It provides a clean, consistent API interface while keeping business logic separate and testable.
+

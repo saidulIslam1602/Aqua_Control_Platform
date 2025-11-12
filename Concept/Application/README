@@ -1,0 +1,211 @@
+# Application Concept Directory
+
+This directory contains theoretical explanations of Application layer concepts, patterns, and how they integrate with Domain, Infrastructure, and API/Presentation layers.
+
+## Files Overview
+
+### 1. CQRS
+**Focus**: Command Query Responsibility Segregation pattern
+
+**Topics Covered**:
+- What is CQRS
+- Why use CQRS
+- Commands vs Queries
+- Command handlers
+- Query handlers
+- Separate read/write models
+- Benefits and trade-offs
+
+**Key Takeaway**: CQRS separates read operations (queries) from write operations (commands), allowing independent optimization and scaling.
+
+---
+
+### 2. Commands
+**Focus**: Command pattern for write operations
+
+**Topics Covered**:
+- What are Commands
+- Command characteristics
+- Command handlers
+- Command validation
+- Command naming conventions
+- Command flow
+- Error handling in commands
+
+**Key Takeaway**: Commands represent write operations that change system state, handled by command handlers in the Application layer.
+
+---
+
+### 3. Queries
+**Focus**: Query pattern for read operations
+
+**Topics Covered**:
+- What are Queries
+- Query characteristics
+- Query handlers
+- Query optimization
+- Query naming conventions
+- Query flow
+- Read models for queries
+
+**Key Takeaway**: Queries represent read operations that retrieve data, handled by query handlers using optimized read models.
+
+---
+
+### 4. Handlers
+**Focus**: Command and Query handlers implementation
+
+**Topics Covered**:
+- Handler pattern
+- Command handlers
+- Query handlers
+- Handler responsibilities
+- Handler dependencies
+- Handler testing
+- Handler best practices
+
+**Key Takeaway**: Handlers implement use cases by orchestrating Domain operations and coordinating with Infrastructure.
+
+---
+
+### 5. ResultPattern
+**Focus**: Result pattern for error handling
+
+**Topics Covered**:
+- What is Result Pattern
+- Why use Result Pattern
+- Result<T> implementation
+- Error handling
+- Success and failure cases
+- Result chaining
+- Benefits over exceptions
+
+**Key Takeaway**: Result pattern provides a functional approach to error handling, making errors explicit and composable.
+
+---
+
+### 6. API
+**Focus**: API/Presentation layer concepts
+
+**Topics Covered**:
+- What is the API/Presentation Layer
+- API layer responsibilities
+- REST API controllers
+- SignalR hubs
+- Middleware
+- Service configuration
+- Request/response transformation
+- Error handling
+- Authentication and authorization
+- Health checks
+
+**Key Takeaway**: The API/Presentation layer is a thin entry point that handles HTTP and WebSocket protocols, delegates to Application layer via MediatR, and provides consistent error handling and logging.
+
+---
+
+## Reading Order
+
+**For Beginners**:
+1. Start with `CQRS.md` - Understand the separation of read and write
+2. Read `Commands.md` - Understand write operations
+3. Read `Queries.md` - Understand read operations
+4. Read `Handlers.md` - Understand how handlers work
+5. Read `ResultPattern.md` - Understand error handling
+6. Read `API.md` - Understand the API/Presentation layer
+
+**For Reference**:
+- Use `CQRS.md` when designing command/query separation
+- Use `Commands.md` when implementing write operations
+- Use `Queries.md` when implementing read operations
+- Use `Handlers.md` when implementing use cases
+- Use `ResultPattern.md` when handling errors
+- Use `API.md` when implementing API endpoints
+
+---
+
+## Quick Reference
+
+### CQRS
+- Commands: Write operations (change state)
+- Queries: Read operations (retrieve data)
+- Separate models for read/write
+- Independent optimization
+
+### Commands
+- Past tense verbs: `CreateTank`, `UpdateTank`
+- Return `Result` or `Result<TId>`
+- Change system state
+- Business rules enforced
+
+### Queries
+- Present tense: `GetTanks`, `GetTankById`
+- Return `Result<T>` or `Result<PagedResult<T>>`
+- Read-only operations
+- Optimized for reading
+
+### Handlers
+- Implement `IRequestHandler<TRequest, TResult>`
+- Orchestrate Domain operations
+- Use Infrastructure via interfaces
+- Return Result pattern
+
+### Result Pattern
+- `Result<T>` for success/failure
+- `Error` type for error details
+- Explicit error handling
+- Composable operations
+
+### API/Presentation Layer
+- Thin entry point
+- Handles HTTP/WebSocket
+- Delegates to Application via MediatR
+- Global error handling
+
+---
+
+## Related Concepts
+
+- See `Concept/Layers/` for how Application relates to Domain, Infrastructure, and API/Presentation layers
+- See `Concept/Backend/` for Domain layer concepts (Aggregates, Entities, Value Objects, Events)
+- See `Concept/Infrastructure/` for Infrastructure layer concepts (Event Sourcing, Read Models, Repository Pattern)
+- See `Concept/Frontend/` for Frontend layer concepts
+
+---
+
+## Application Layer Responsibilities
+
+**Application Layer Provides**:
+- Use case orchestration
+- Command and Query handlers (CQRS)
+- DTOs and mapping
+- Input validation
+- Business coordination
+- Interface definitions for Infrastructure
+
+**Application Layer Depends On**:
+- Domain layer (uses domain models and methods)
+- Infrastructure layer (via interfaces)
+
+**Application Layer is Used By**:
+- API/Presentation layer (via MediatR commands/queries)
+- Infrastructure layer (implements Application interfaces)
+
+---
+
+## API/Presentation Layer Responsibilities
+
+**API/Presentation Layer Provides**:
+- HTTP request handling (REST API)
+- WebSocket connections (SignalR)
+- Request/response transformation
+- API documentation (Swagger)
+- Authentication and authorization
+- Global error handling and logging
+- Health checks
+
+**API/Presentation Layer Depends On**:
+- Application layer (via MediatR)
+
+**API/Presentation Layer is Used By**:
+- Frontend layer (via HTTP/WebSocket)
+
