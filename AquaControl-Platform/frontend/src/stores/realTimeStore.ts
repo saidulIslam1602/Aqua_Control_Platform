@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import * as signalR from '@microsoft/signalr'
 import type { RealTimeEvent } from '@types/api'
 
@@ -10,6 +10,10 @@ export const useRealTimeStore = defineStore('realtime', () => {
   const isConnected = ref(false)
   const connectionState = ref<'Disconnected' | 'Connecting' | 'Connected' | 'Disconnecting' | 'Reconnecting'>('Disconnected')
   const eventHandlers = ref<Map<string, EventHandler[]>>(new Map())
+
+  const isConnecting = computed(() => 
+    connectionState.value === 'Connecting' || connectionState.value === 'Reconnecting'
+  )
 
   const connect = async () => {
     if (connection.value && isConnected.value) {
@@ -119,6 +123,7 @@ export const useRealTimeStore = defineStore('realtime', () => {
   return {
     connection,
     isConnected,
+    isConnecting,
     connectionState,
     connect,
     disconnect,

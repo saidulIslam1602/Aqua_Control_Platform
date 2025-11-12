@@ -23,13 +23,22 @@ export const useAuthStore = defineStore('auth', () => {
     throw new Error('Token refresh not implemented')
   }
 
+  const initialize = async () => {
+    // Check if user is already authenticated
+    if (token.value) {
+      isAuthenticated.value = true
+      // TODO: Validate token and refresh if needed
+    }
+  }
+
   return {
     token,
     user,
     isAuthenticated,
     login,
     logout,
-    refreshToken
+    refreshToken,
+    initialize
   }
 }, {
   persist: {

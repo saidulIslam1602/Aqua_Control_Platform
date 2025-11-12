@@ -38,6 +38,26 @@ This directory contains theoretical explanations of Frontend layer concepts, pat
 
 ---
 
+### 3. Implementation
+**Focus**: Frontend implementation patterns and architecture
+
+**Topics Covered**:
+- Application initialization (main.ts, App.vue)
+- Authentication flow and router guards
+- Layout architecture (AppLayout)
+- State management patterns (Pinia stores)
+- Real-time communication (SignalR integration)
+- Notification system
+- Routing patterns with lazy loading
+- Composables (useDebouncedRef)
+- Component communication
+- Error handling (global and component-level)
+- Best practices and performance optimization
+
+**Key Takeaway**: The frontend follows Vue.js 3 best practices with Composition API, comprehensive error handling, optimistic updates, and real-time communication for excellent user experience.
+
+---
+
 ## Reading Order
 
 **For Beginners**:
@@ -87,7 +107,8 @@ This directory contains theoretical explanations of Frontend layer concepts, pat
 ### Key Technologies
 - **Vue.js 3**: Progressive framework with Composition API
 - **Pinia**: State management with TypeScript support
-- **Vue Router**: Client-side routing
+- **Vue Router**: Client-side routing with authentication guards
+- **Element Plus**: UI component library
 - **Axios**: HTTP client with interceptors
 - **SignalR**: Real-time communication
 - **TypeScript**: Type safety and better DX
@@ -103,20 +124,58 @@ This directory contains theoretical explanations of Frontend layer concepts, pat
 
 ---
 
+## Frontend Implementation Structure
+
+### Core Application Files
+- **main.ts**: Application entry point with Element Plus, Pinia, Router setup
+- **App.vue**: Root component with authentication wrapper, loading states, global error handling
+
+### Layout Components
+- **AppLayout.vue**: Main application layout with sidebar navigation, header, and user menu
+
+### Common Components
+- **NotificationContainer.vue**: Global notification system for user feedback
+- **ConnectionStatus.vue**: Real-time connection status indicator with reconnect functionality
+
+### Views
+- **LoginView.vue**: Authentication page with form validation
+- **DashboardView.vue**: Main dashboard (placeholder)
+- **TankList.vue**: Tank management list view
+- **TankDetail.vue**: Individual tank details view
+- **SensorsView.vue**: Sensors management (placeholder)
+- **AnalyticsView.vue**: Analytics dashboard (placeholder)
+- **SettingsView.vue**: Application settings (placeholder)
+- **NotFoundView.vue**: 404 error page
+
+### Composables
+- **useDebouncedRef.ts**: Debounced reactive reference for search inputs
+
+### Stores
+- **authStore.ts**: Authentication state and methods (login, logout, initialize)
+- **tankStore.ts**: Tank management with optimistic updates
+- **realTimeStore.ts**: SignalR connection management and event subscriptions
+- **notificationStore.ts**: Global notification queue management
+
+### Router
+- **index.ts**: Route definitions with lazy loading, authentication guards, and page title management
+
 ## Frontend Responsibilities
 
 **Frontend Layer Provides**:
-- User interface components
-- State management (Pinia stores)
-- API communication (services)
-- Real-time updates (SignalR)
-- Client-side routing
+- User interface components (Element Plus integration)
+- State management (Pinia stores with optimistic updates)
+- API communication (services with HTTP client)
+- Real-time updates (SignalR integration)
+- Client-side routing (Vue Router with guards)
+- Authentication flow (login, logout, token management)
 - Form validation and user input
+- Global error handling and notifications
+- Loading states and user feedback
 
 **Frontend Layer Depends On**:
-- Backend API (REST/GraphQL)
-- Real-time hubs (SignalR)
-- Authentication services
+- Backend API (REST endpoints via Application layer)
+- Real-time hubs (SignalR via Infrastructure layer)
+- Authentication services (JWT tokens)
 
 **Frontend Layer is Used By**:
 - End users through web browsers
