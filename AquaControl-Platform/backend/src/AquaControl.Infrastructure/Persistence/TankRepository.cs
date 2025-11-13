@@ -42,19 +42,23 @@ public sealed class TankRepository : ITankRepository
             return null;
         }
 
-        // If no snapshot, we need to reconstruct from events
-        // For now, we'll use a simplified approach - in production, you'd have proper event replay
+        // If no snapshot, create tank from first event (TankCreatedEvent)
         if (tank == null && events.Any())
         {
-            // Get the first event to reconstruct initial state
             var firstEvent = events.First();
             if (firstEvent is Domain.Events.TankCreatedEvent createdEvent)
             {
-                tank = Tank.Create(
-                    createdEvent.Name,
-                    createdEvent.Capacity,
-                    createdEvent.Location,
-                    createdEvent.TankType);
+                // Create tank instance for event replay
+                tank = Tank.FromEventReplay(id.Value);
+                // Apply the creation event to set initial state
+                tank.When(createdEvent);
+                // Skip the first event in the replay loop since we've already applied it
+                events = events.Skip(1);
+            }
+            else
+            {
+                _logger.LogWarning("First event for tank {TankId} is not TankCreatedEvent, cannot reconstruct", id.Value);
+                return null;
             }
         }
 
@@ -63,15 +67,15 @@ public sealed class TankRepository : ITankRepository
             return null;
         }
 
-        // Apply remaining events to rebuild state
-        // Note: This is simplified - in production, you'd have proper event application logic
-        foreach (var domainEvent in events.Skip(1))
+        // Replay all remaining events to rebuild current state
+        foreach (var domainEvent in events)
         {
             ApplyEventToAggregate(tank, domainEvent);
         }
 
-        // Save snapshot if many events have been applied
-        if (events.Count() > 10)
+        // Save snapshot if many events have been applied (optimization)
+        var totalEvents = fromVersion + events.Count();
+        if (totalEvents > 10 && totalEvents % 10 == 0)
         {
             await _eventStore.SaveSnapshotAsync(tank, cancellationToken);
         }
@@ -146,16 +150,29 @@ public sealed class TankRepository : ITankRepository
         await UpdateAsync(tank, cancellationToken);
     }
 
+    /// <summary>
+    /// Applies a domain event to the tank aggregate to rebuild its state.
+    /// This method is called during event sourcing replay to reconstruct aggregate state from events.
+    /// </summary>
+    /// <param name="tank">The tank aggregate to apply the event to.</param>
+    /// <param name="domainEvent">The domain event to apply.</param>
     private void ApplyEventToAggregate(Tank tank, IDomainEvent domainEvent)
     {
-        // This is a simplified placeholder
-        // In production, you'd have a proper event application mechanism
-        // For now, we'll just log that we're applying the event
-        _logger.LogDebug("Applying event {EventType} to tank {TankId}", 
-            domainEvent.EventType, tank.Id);
-        
-        // In a real implementation, you'd have event handlers that apply events to rebuild state
-        // This would typically use reflection or a more sophisticated event sourcing framework
+        try
+        {
+            _logger.LogDebug("Applying event {EventType} to tank {TankId} for event replay", 
+                domainEvent.EventType, tank.Id);
+            
+            // Call the When() method on the aggregate to apply the event
+            // This rebuilds the aggregate state without raising new events
+            tank.When(domainEvent);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to apply event {EventType} to tank {TankId} during replay",
+                domainEvent.EventType, tank.Id);
+            throw;
+        }
     }
 }
 

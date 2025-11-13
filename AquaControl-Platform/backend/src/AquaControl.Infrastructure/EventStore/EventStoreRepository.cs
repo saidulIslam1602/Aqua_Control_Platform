@@ -1,7 +1,9 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using System.Text.Json;
+using System.Reflection;
 using AquaControl.Domain.Common;
+using AquaControl.Domain.Events;
 using AquaControl.Infrastructure.EventStore.Models;
 
 namespace AquaControl.Infrastructure.EventStore;
@@ -22,6 +24,30 @@ public sealed class EventStoreRepository : IEventStore
     private readonly EventStoreDbContext _context;
     private readonly ILogger<EventStoreRepository> _logger;
     private readonly JsonSerializerOptions _jsonOptions;
+    private static readonly Dictionary<string, Type> EventTypeMap = new();
+
+    static EventStoreRepository()
+    {
+        // Build event type map from all domain events
+        var domainEventAssembly = Assembly.GetAssembly(typeof(DomainEvent));
+        if (domainEventAssembly == null) return;
+
+        var eventTypes = domainEventAssembly
+            .GetTypes()
+            .Where(t => 
+                (t.IsClass || t.IsValueType) && 
+                !t.IsAbstract && 
+                typeof(IDomainEvent).IsAssignableFrom(t) &&
+                t != typeof(IDomainEvent) &&
+                t != typeof(DomainEvent))
+            .ToList();
+
+        foreach (var eventType in eventTypes)
+        {
+            // Use the type name as the key (events use nameof(EventType) which matches the class name)
+            EventTypeMap[eventType.Name] = eventType;
+        }
+    }
 
     public EventStoreRepository(EventStoreDbContext context, ILogger<EventStoreRepository> logger)
     {
@@ -44,8 +70,25 @@ public sealed class EventStoreRepository : IEventStore
         var eventsList = events.ToList();
         if (!eventsList.Any()) return;
 
-        _logger.LogDebug("Saving {EventCount} events for aggregate {AggregateId}", 
-            eventsList.Count, aggregateId);
+        _logger.LogDebug("Saving {EventCount} events for aggregate {AggregateId} with expected version {ExpectedVersion}", 
+            eventsList.Count, aggregateId, expectedVersion);
+
+        // Check optimistic concurrency: verify that the current version matches expected version
+        var currentVersion = await _context.Events
+            .Where(e => e.AggregateId == aggregateId)
+            .OrderByDescending(e => e.Version)
+            .Select(e => e.Version)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (currentVersion != expectedVersion)
+        {
+            _logger.LogWarning(
+                "Concurrency conflict for aggregate {AggregateId}: expected version {ExpectedVersion}, but current version is {CurrentVersion}",
+                aggregateId, expectedVersion, currentVersion);
+            throw new InvalidOperationException(
+                $"Concurrency conflict: Expected version {expectedVersion}, but current version is {currentVersion}. " +
+                "The aggregate has been modified by another process. Please reload and try again.");
+        }
 
         var storedEvents = eventsList.Select((domainEvent, index) => new StoredEvent
         {
@@ -60,8 +103,8 @@ public sealed class EventStoreRepository : IEventStore
         _context.Events.AddRange(storedEvents);
         await _context.SaveChangesAsync(cancellationToken);
 
-        _logger.LogInformation("Saved {EventCount} events for aggregate {AggregateId}",
-            eventsList.Count, aggregateId);
+        _logger.LogInformation("Saved {EventCount} events for aggregate {AggregateId} at version {NewVersion}",
+            eventsList.Count, aggregateId, expectedVersion + eventsList.Count);
     }
 
     public async Task<IEnumerable<IDomainEvent>> GetEventsAsync(Guid aggregateId, long fromVersion = 0, CancellationToken cancellationToken = default)
@@ -80,10 +123,26 @@ public sealed class EventStoreRepository : IEventStore
         {
             try
             {
-                // For simplicity, we'll create a basic domain event
-                // In production, you'd have proper event deserialization
-                var domainEvent = new GenericDomainEvent(storedEvent.EventType, storedEvent.EventData, storedEvent.Timestamp);
-                domainEvents.Add(domainEvent);
+                // Try to find the event type in our map
+                if (!EventTypeMap.TryGetValue(storedEvent.EventType, out var eventType))
+                {
+                    _logger.LogWarning("Unknown event type {EventType} for event {EventId}, skipping",
+                        storedEvent.EventType, storedEvent.Id);
+                    continue;
+                }
+
+                // Deserialize the event to its proper type
+                var domainEvent = JsonSerializer.Deserialize(storedEvent.EventData, eventType, _jsonOptions);
+                
+                if (domainEvent is IDomainEvent typedEvent)
+                {
+                    domainEvents.Add(typedEvent);
+                }
+                else
+                {
+                    _logger.LogWarning("Deserialized event {EventId} is not an IDomainEvent",
+                        storedEvent.Id);
+                }
             }
             catch (Exception ex)
             {
@@ -160,12 +219,4 @@ public sealed class EventStoreRepository : IEventStore
             return null;
         }
     }
-}
-
-// Simple domain event for deserialization
-public record GenericDomainEvent(string EventType, string Data, DateTime OccurredOn) : IDomainEvent
-{
-    public Guid EventId { get; } = Guid.NewGuid();
-    string IDomainEvent.EventType => EventType;
-    DateTime IDomainEvent.OccurredOn => OccurredOn;
 }

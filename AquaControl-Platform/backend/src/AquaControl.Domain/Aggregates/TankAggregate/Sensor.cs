@@ -157,6 +157,26 @@ public sealed class Sensor : Entity<SensorId>
     }
 
     /// <summary>
+    /// Creates a sensor instance from event replay data.
+    /// This method is used when rebuilding aggregate state from events and minimal sensor information is available.
+    /// </summary>
+    /// <param name="sensorId">The unique identifier for this sensor.</param>
+    /// <param name="sensorType">The type of sensor.</param>
+    /// <returns>A new <see cref="Sensor"/> instance with default values for missing properties.</returns>
+    /// <remarks>
+    /// This factory method is used during event sourcing replay when only SensorId and SensorType
+    /// are available from events. Full sensor details should be loaded from read models or snapshots
+    /// if available. Consider enhancing events to include full sensor information.
+    /// </remarks>
+    internal static Sensor FromEventReplay(SensorId sensorId, SensorType sensorType)
+    {
+        // Create sensor with minimal information for event replay
+        // Default values are used for properties not available in the event
+        var sensor = new Sensor(sensorId, sensorType, "Unknown", "Unknown", "N/A", 95m);
+        return sensor;
+    }
+
+    /// <summary>
     /// Calibrates the sensor with a new accuracy value and sets the next calibration date.
     /// </summary>
     /// <param name="calibrationDate">The date when calibration was performed. Cannot be in the future.</param>

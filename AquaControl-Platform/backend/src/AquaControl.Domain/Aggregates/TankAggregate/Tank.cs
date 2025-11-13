@@ -101,6 +101,17 @@ public sealed class Tank : AggregateRoot<Guid>
     }
 
     /// <summary>
+    /// Initializes a new instance of the <see cref="Tank"/> class for event replay.
+    /// This constructor does not raise domain events and is used exclusively for event sourcing replay.
+    /// </summary>
+    /// <param name="id">The unique identifier for this tank.</param>
+    private Tank(Guid id) : base(id)
+    {
+        // Initialize with default values that will be overwritten by event replay
+        // This constructor does not raise events
+    }
+
+    /// <summary>
     /// Creates a new tank instance with the specified properties.
     /// </summary>
     /// <param name="name">The name of the tank. Cannot be null or empty.</param>
@@ -120,6 +131,25 @@ public sealed class Tank : AggregateRoot<Guid>
 
         var tankId = Guid.NewGuid();
         return new Tank(tankId, name, capacity, location, tankType);
+    }
+
+    /// <summary>
+    /// Creates a tank instance from event replay data.
+    /// This method is used when rebuilding aggregate state from events during event sourcing replay.
+    /// </summary>
+    /// <param name="tankId">The unique identifier for this tank.</param>
+    /// <returns>A new <see cref="Tank"/> instance ready for event replay.</returns>
+    /// <remarks>
+    /// This factory method creates an empty tank instance that can be populated by replaying events.
+    /// It does not raise any domain events, as it's used exclusively for event sourcing replay.
+    /// The tank is created with minimal default values and will be fully populated by replaying events.
+    /// </remarks>
+    internal static Tank FromEventReplay(Guid tankId)
+    {
+        // Create tank using event replay constructor (does not raise events)
+        // The state will be rebuilt by replaying events via When() methods
+        var tank = new Tank(tankId);
+        return tank;
     }
 
     /// <summary>
@@ -386,4 +416,170 @@ public sealed class Tank : AggregateRoot<Guid>
     {
         return _sensors.Where(s => s.IsActive);
     }
+
+    #region Event Replay Methods (When Handlers)
+
+    /// <summary>
+    /// Applies a domain event to rebuild aggregate state during event replay.
+    /// This method is called when loading aggregates from the event store.
+    /// </summary>
+    /// <param name="domainEvent">The domain event to apply.</param>
+    /// <remarks>
+    /// These methods rebuild state from events without raising new events or performing business rule validation.
+    /// They are used exclusively for event sourcing replay scenarios.
+    /// </remarks>
+    public void When(IDomainEvent domainEvent)
+    {
+        switch (domainEvent)
+        {
+            case Events.TankCreatedEvent e:
+                When(e);
+                break;
+            case Events.TankNameChangedEvent e:
+                When(e);
+                break;
+            case Events.TankCapacityChangedEvent e:
+                When(e);
+                break;
+            case Events.TankRelocatedEvent e:
+                When(e);
+                break;
+            case Events.TankActivatedEvent e:
+                When(e);
+                break;
+            case Events.TankDeactivatedEvent e:
+                When(e);
+                break;
+            case Events.TankOptimalParametersSetEvent e:
+                When(e);
+                break;
+            case Events.TankMaintenanceScheduledEvent e:
+                When(e);
+                break;
+            case Events.TankMaintenanceCompletedEvent e:
+                When(e);
+                break;
+            case Events.SensorAddedToTankEvent e:
+                When(e);
+                break;
+            case Events.SensorRemovedFromTankEvent e:
+                When(e);
+                break;
+            default:
+                // Unknown event type - log but don't throw to allow forward compatibility
+                break;
+        }
+    }
+
+    /// <summary>
+    /// Replays a TankCreatedEvent to rebuild initial tank state.
+    /// </summary>
+    private void When(Events.TankCreatedEvent e)
+    {
+        // Rebuild initial state from creation event
+        Name = e.Name;
+        Capacity = e.Capacity;
+        Location = e.Location;
+        TankType = e.TankType;
+        Status = TankStatus.Inactive;
+    }
+
+    /// <summary>
+    /// Replays a TankNameChangedEvent to update the tank name.
+    /// </summary>
+    private void When(Events.TankNameChangedEvent e)
+    {
+        Name = e.NewName;
+    }
+
+    /// <summary>
+    /// Replays a TankCapacityChangedEvent to update the tank capacity.
+    /// </summary>
+    private void When(Events.TankCapacityChangedEvent e)
+    {
+        Capacity = e.NewCapacity;
+    }
+
+    /// <summary>
+    /// Replays a TankRelocatedEvent to update the tank location.
+    /// </summary>
+    private void When(Events.TankRelocatedEvent e)
+    {
+        Location = e.NewLocation;
+    }
+
+    /// <summary>
+    /// Replays a TankActivatedEvent to activate the tank.
+    /// </summary>
+    private void When(Events.TankActivatedEvent e)
+    {
+        Status = TankStatus.Active;
+    }
+
+    /// <summary>
+    /// Replays a TankDeactivatedEvent to deactivate the tank.
+    /// </summary>
+    private void When(Events.TankDeactivatedEvent e)
+    {
+        Status = TankStatus.Inactive;
+    }
+
+    /// <summary>
+    /// Replays a TankOptimalParametersSetEvent to set optimal water quality parameters.
+    /// </summary>
+    private void When(Events.TankOptimalParametersSetEvent e)
+    {
+        OptimalParameters = e.Parameters;
+    }
+
+    /// <summary>
+    /// Replays a TankMaintenanceScheduledEvent to schedule maintenance.
+    /// </summary>
+    private void When(Events.TankMaintenanceScheduledEvent e)
+    {
+        NextMaintenanceDate = e.ScheduledDate;
+    }
+
+    /// <summary>
+    /// Replays a TankMaintenanceCompletedEvent to mark maintenance as completed.
+    /// </summary>
+    private void When(Events.TankMaintenanceCompletedEvent e)
+    {
+        LastMaintenanceDate = e.CompletionDate;
+        NextMaintenanceDate = null;
+    }
+
+    /// <summary>
+    /// Replays a SensorAddedToTankEvent to add a sensor to the tank.
+    /// </summary>
+    /// <remarks>
+    /// Note: This event only contains SensorId and SensorType. To fully recreate the sensor,
+    /// additional information (model, manufacturer, serialNumber, accuracy) would be needed.
+    /// The FromEventReplay factory method creates a sensor with default values for missing properties.
+    /// Consider enhancing the event to include full sensor details, or load sensor data from read models/snapshots.
+    /// </remarks>
+    private void When(Events.SensorAddedToTankEvent e)
+    {
+        // Check if sensor already exists (idempotency)
+        if (_sensors.Any(s => s.Id == e.SensorId))
+            return;
+
+        // Create sensor from event replay data (with minimal information)
+        var sensor = Sensor.FromEventReplay(e.SensorId, e.SensorType);
+        _sensors.Add(sensor);
+    }
+
+    /// <summary>
+    /// Replays a SensorRemovedFromTankEvent to remove a sensor from the tank.
+    /// </summary>
+    private void When(Events.SensorRemovedFromTankEvent e)
+    {
+        var sensor = _sensors.FirstOrDefault(s => s.Id == e.SensorId);
+        if (sensor != null)
+        {
+            _sensors.Remove(sensor);
+        }
+    }
+
+    #endregion
 }
