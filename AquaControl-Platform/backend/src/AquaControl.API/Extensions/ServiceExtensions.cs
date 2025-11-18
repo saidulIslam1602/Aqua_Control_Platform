@@ -134,24 +134,42 @@ public static class ServiceExtensions
         return services;
     }
 
-    public static IServiceCollection AddCorsServices(this IServiceCollection services)
+    public static IServiceCollection AddCorsServices(this IServiceCollection services, IConfiguration configuration)
     {
         services.AddCors(options =>
         {
-            options.AddPolicy("AllowAll", builder =>
+            // Development CORS policy - more restrictive than before
+            options.AddPolicy("Development", builder =>
             {
                 builder
-                    .AllowAnyOrigin()
-                    .AllowAnyMethod()
-                    .AllowAnyHeader();
-            });
-
-            options.AddPolicy("Production", builder =>
-            {
-                builder
-                    .WithOrigins("https://aquacontrol.com", "https://app.aquacontrol.com")
+                    .WithOrigins("http://localhost:5173", "http://localhost:3000", "http://localhost:8080")
                     .AllowAnyMethod()
                     .AllowAnyHeader()
+                    .AllowCredentials()
+                    .SetIsOriginAllowedToAllowWildcardSubdomains();
+            });
+
+            // Production CORS policy - very restrictive
+            options.AddPolicy("Production", builder =>
+            {
+                var allowedOrigins = configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() 
+                    ?? new[] { "https://aquacontrol.com", "https://app.aquacontrol.com" };
+                
+                builder
+                    .WithOrigins(allowedOrigins)
+                    .WithMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
+                    .WithHeaders("Content-Type", "Authorization", "X-Requested-With")
+                    .AllowCredentials()
+                    .SetPreflightMaxAge(TimeSpan.FromMinutes(10));
+            });
+
+            // Fallback policy for unknown environments
+            options.AddPolicy("Restricted", builder =>
+            {
+                builder
+                    .WithOrigins("http://localhost:5173")
+                    .WithMethods("GET", "POST")
+                    .WithHeaders("Content-Type", "Authorization")
                     .AllowCredentials();
             });
         });

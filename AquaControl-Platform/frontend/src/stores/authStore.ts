@@ -41,8 +41,15 @@ export const useAuthStore = defineStore('auth', () => {
         hasAccessToken: !!response.accessToken,
         hasRefreshToken: !!response.refreshToken,
         hasUser: !!response.user,
-        userFirstName: response.user?.firstName
+        userFirstName: response.user?.firstName,
+        fullResponse: response
       })
+      
+      // Check if response has the expected structure
+      if (!response.accessToken || !response.user) {
+        console.error('❌ Invalid response structure:', response)
+        throw new Error('Invalid response from server')
+      }
       
       token.value = response.accessToken
       refreshTokenValue.value = response.refreshToken
@@ -51,8 +58,15 @@ export const useAuthStore = defineStore('auth', () => {
       console.log('✅ Auth state updated:', {
         tokenSet: !!token.value,
         userSet: !!user.value,
-        isAuthenticated: isAuthenticated.value
+        isAuthenticated: isAuthenticated.value,
+        tokenLength: token.value?.length,
+        userName: user.value?.username
       })
+      
+      // Force a small delay to ensure persistence completes
+      await new Promise(resolve => setTimeout(resolve, 100))
+      
+      console.log('✅ After persistence delay, isAuthenticated:', isAuthenticated.value)
 
       notificationStore.addNotification({
         type: 'success',

@@ -49,6 +49,14 @@ export class TankService {
     return httpClient.post<void>(`${this.baseUrl}/${id}/deactivate`, { reason })
   }
 
+  async updateTankStatus(id: string, isActive: boolean): Promise<ApiResponse<Tank>> {
+    if (isActive) {
+      return this.activateTank(id) as Promise<ApiResponse<Tank>>
+    } else {
+      return this.deactivateTank(id, 'Manual deactivation') as Promise<ApiResponse<Tank>>
+    }
+  }
+
   async scheduleMaintenance(id: string, maintenanceDate: string): Promise<ApiResponse<void>> {
     return httpClient.post<void>(`${this.baseUrl}/${id}/schedule-maintenance`, { maintenanceDate })
   }

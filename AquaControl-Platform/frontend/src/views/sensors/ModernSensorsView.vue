@@ -174,21 +174,10 @@
               </p>
             </div>
 
-            <div class="sensor-reading" v-if="sensor.lastReading">
-              <div class="reading-value">
-                {{ sensor.lastReading.value }}
-                <span class="reading-unit">{{ sensor.lastReading.unit }}</span>
-              </div>
-              <div class="reading-time">
-                <el-icon><Clock /></el-icon>
-                <span>{{ formatRelativeTime(sensor.lastReading.timestamp) }}</span>
-              </div>
-            </div>
-
-            <div class="sensor-reading empty" v-else>
+            <div class="sensor-reading">
               <div class="no-data">
-                <el-icon><WarningFilled /></el-icon>
-                <span>No recent data</span>
+                <el-icon><Monitor /></el-icon>
+                <span>Ready to monitor</span>
               </div>
             </div>
 
@@ -217,7 +206,7 @@
                 </button>
                 <button 
                   class="action-btn action-btn--danger" 
-                  @click="removeSensor()"
+                  @click="removeSensor(sensor.id)"
                   title="Remove"
                 >
                   <el-icon><Delete /></el-icon>
@@ -228,6 +217,108 @@
         </div>
       </div>
     </section>
+
+    <!-- Add Sensor Modal -->
+    <el-dialog
+      v-model="showAddModal"
+      title="Add New Sensor"
+      width="600px"
+      :close-on-click-modal="false"
+    >
+      <el-form
+        ref="sensorFormRef"
+        :model="sensorForm"
+        :rules="sensorFormRules"
+        label-position="top"
+      >
+        <el-form-item label="Sensor Type" prop="sensorType">
+          <el-select
+            v-model="sensorForm.sensorType"
+            placeholder="Select sensor type"
+            size="large"
+            style="width: 100%"
+          >
+            <el-option label="Temperature" value="Temperature" />
+            <el-option label="pH" value="pH" />
+            <el-option label="Oxygen" value="Oxygen" />
+            <el-option label="Salinity" value="Salinity" />
+            <el-option label="Turbidity" value="Turbidity" />
+          </el-select>
+        </el-form-item>
+
+        <el-form-item label="Model" prop="model">
+          <el-input
+            v-model="sensorForm.model"
+            placeholder="Enter sensor model"
+            size="large"
+          />
+        </el-form-item>
+
+        <el-form-item label="Tank" prop="tankId">
+          <el-select
+            v-model="sensorForm.tankId"
+            placeholder="Select tank"
+            size="large"
+            style="width: 100%"
+          >
+            <el-option
+              v-for="tank in tanks"
+              :key="tank.id"
+              :label="tank.name"
+              :value="tank.id"
+            />
+          </el-select>
+        </el-form-item>
+
+        <el-form-item label="Serial Number" prop="serialNumber">
+          <el-input
+            v-model="sensorForm.serialNumber"
+            placeholder="Enter serial number"
+            size="large"
+          />
+        </el-form-item>
+
+        <div class="form-row">
+          <el-form-item label="Min Value" prop="minValue">
+            <el-input
+              v-model.number="sensorForm.minValue"
+              type="number"
+              placeholder="Minimum value"
+              size="large"
+            />
+          </el-form-item>
+
+          <el-form-item label="Max Value" prop="maxValue">
+            <el-input
+              v-model.number="sensorForm.maxValue"
+              type="number"
+              placeholder="Maximum value"
+              size="large"
+            />
+          </el-form-item>
+        </div>
+
+        <el-form-item label="Calibration Date">
+          <el-date-picker
+            v-model="sensorForm.calibrationDate"
+            type="date"
+            placeholder="Select calibration date"
+            size="large"
+            style="width: 100%"
+          />
+        </el-form-item>
+      </el-form>
+
+      <template #footer>
+        <div class="dialog-footer">
+          <button class="btn btn-outline" @click="closeAddModal">Cancel</button>
+          <button class="btn btn-primary" @click="addSensor" :disabled="isAdding">
+            <el-icon v-if="isAdding" class="is-loading"><Loading /></el-icon>
+            <span>{{ isAdding ? 'Adding...' : 'Add Sensor' }}</span>
+          </button>
+        </div>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -235,6 +326,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useTankStore } from '@/stores/tankStore'
+import { useSensorStore } from '@/stores/sensorStore'
 import ModernCard from '@/components/common/ModernCard.vue'
 import {
   Plus,
@@ -258,75 +350,68 @@ import {
   Compass
 } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import type { FormInstance } from 'element-plus'
 
 // Router and Store
 const router = useRouter()
 const tankStore = useTankStore()
+const sensorStore = useSensorStore()
 
 // State
 const searchTerm = ref('')
 const selectedType = ref('')
 const selectedStatus = ref('')
 const selectedTank = ref('')
-const isLoading = ref(false)
+const showAddModal = ref(false)
+const isAdding = ref(false)
+const sensorFormRef = ref()
 
-// Mock sensor data - Replace with real API call
-const mockSensors = ref([
-  {
-    id: '1',
-    sensorType: 'Temperature',
-    model: 'TMP-2000',
-    status: 'Active',
-    tankId: 'tank-1',
-    lastReading: { value: 24.5, unit: '°C', timestamp: new Date().toISOString() }
-  },
-  {
-    id: '2',
-    sensorType: 'pH',
-    model: 'PH-500',
-    status: 'Active',
-    tankId: 'tank-1',
-    lastReading: { value: 7.2, unit: 'pH', timestamp: new Date(Date.now() - 3600000).toISOString() }
-  },
-  {
-    id: '3',
-    sensorType: 'Oxygen',
-    model: 'OXY-100',
-    status: 'Warning',
-    tankId: 'tank-2',
-    lastReading: { value: 6.5, unit: 'mg/L', timestamp: new Date(Date.now() - 7200000).toISOString() }
-  },
-  {
-    id: '4',
-    sensorType: 'Salinity',
-    model: 'SAL-300',
-    status: 'Active',
-    tankId: 'tank-2',
-    lastReading: { value: 35, unit: 'ppt', timestamp: new Date().toISOString() }
-  },
-  {
-    id: '5',
-    sensorType: 'Turbidity',
-    model: 'TUR-400',
-    status: 'Error',
-    tankId: 'tank-3',
-    lastReading: null
-  },
-  {
-    id: '6',
-    sensorType: 'Temperature',
-    model: 'TMP-2000',
-    status: 'Offline',
-    tankId: 'tank-3',
-    lastReading: null
-  }
-])
+// Sensor form data
+const sensorForm = ref({
+  sensorType: '',
+  model: '',
+  tankId: '',
+  serialNumber: '',
+  minValue: 0,
+  maxValue: 100,
+  unit: '',
+  calibrationDate: new Date(),
+  manufacturer: '',
+  description: ''
+})
+
+// Form validation rules
+const sensorFormRules = {
+  sensorType: [
+    { required: true, message: 'Please select sensor type', trigger: 'change' }
+  ],
+  model: [
+    { required: true, message: 'Please enter model', trigger: 'blur' },
+    { min: 2, max: 50, message: 'Model should be 2-50 characters', trigger: 'blur' }
+  ],
+  tankId: [
+    { required: true, message: 'Please select tank', trigger: 'change' }
+  ],
+  serialNumber: [
+    { required: true, message: 'Please enter serial number', trigger: 'blur' }
+  ],
+  minValue: [
+    { required: true, message: 'Please enter minimum value', trigger: 'blur' },
+    { type: 'number', message: 'Must be a number', trigger: 'blur' }
+  ],
+  maxValue: [
+    { required: true, message: 'Please enter maximum value', trigger: 'blur' },
+    { type: 'number', message: 'Must be a number', trigger: 'blur' }
+  ]
+}
 
 // Computed
 const tanks = computed(() => tankStore.tanks)
+const isLoading = computed(() => sensorStore.isLoading)
 
+// Apply local filters on top of store filters
 const filteredSensors = computed(() => {
-  let sensors = mockSensors.value
+  let sensors = sensorStore.sensors
 
   if (searchTerm.value) {
     const search = searchTerm.value.toLowerCase()
@@ -351,10 +436,10 @@ const filteredSensors = computed(() => {
   return sensors
 })
 
-const totalSensors = computed(() => mockSensors.value.length)
-const activeSensors = computed(() => mockSensors.value.filter(s => s.status === 'Active').length)
-const warningSensors = computed(() => mockSensors.value.filter(s => s.status === 'Warning').length)
-const offlineSensors = computed(() => mockSensors.value.filter(s => s.status === 'Offline' || s.status === 'Error').length)
+const totalSensors = computed(() => sensorStore.sensors.length)
+const activeSensors = computed(() => sensorStore.activeSensors.length)
+const warningSensors = computed(() => sensorStore.sensors.filter(s => s.status === 'Error').length)
+const offlineSensors = computed(() => sensorStore.offlineSensors.length)
 
 // Methods
 const getSensorIcon = (type: string) => {
@@ -389,28 +474,115 @@ const formatRelativeTime = (timestamp: string) => {
 }
 
 const addNewSensor = () => {
-  ElMessage.info('Add sensor modal - Coming soon')
-  // TODO: Implement add sensor modal
+  showAddModal.value = true
+}
+
+const closeAddModal = () => {
+  showAddModal.value = false
+  sensorFormRef.value?.resetFields()
+  sensorForm.value = {
+    sensorType: '',
+    model: '',
+    tankId: '',
+    serialNumber: '',
+    minValue: 0,
+    maxValue: 100,
+    unit: '',
+    calibrationDate: new Date(),
+    manufacturer: '',
+    description: ''
+  }
+}
+
+const addSensor = async () => {
+  if (!sensorFormRef.value) return
+
+  await sensorFormRef.value.validate(async (valid: boolean) => {
+    if (valid) {
+      isAdding.value = true
+      try {
+        // Determine unit based on sensor type
+        let unit = ''
+        switch (sensorForm.value.sensorType) {
+          case 'Temperature':
+            unit = '°C'
+            break
+          case 'pH':
+            unit = 'pH'
+            break
+          case 'Oxygen':
+          case 'DissolvedOxygen':
+            unit = 'mg/L'
+            break
+          case 'Salinity':
+            unit = 'ppt'
+            break
+          case 'Turbidity':
+            unit = 'NTU'
+            break
+          default:
+            unit = 'unit'
+        }
+
+        await sensorStore.createSensor({
+          sensorType: sensorForm.value.sensorType,
+          model: sensorForm.value.model,
+          tankId: sensorForm.value.tankId,
+          serialNumber: sensorForm.value.serialNumber,
+          minValue: sensorForm.value.minValue,
+          maxValue: sensorForm.value.maxValue,
+          unit: unit,
+          calibrationDate: sensorForm.value.calibrationDate,
+          manufacturer: sensorForm.value.manufacturer,
+          description: sensorForm.value.description
+        })
+        
+        closeAddModal()
+      } catch (error: any) {
+        ElMessage.error(error.message || 'Failed to add sensor')
+      } finally {
+        isAdding.value = false
+      }
+    }
+  })
 }
 
 const viewSensorDetails = (id: string) => {
-  ElMessage.info(`View sensor details: ${id}`)
-  // TODO: Implement sensor detail view
+  router.push(`/sensors/${id}`)
 }
 
 const viewSensorHistory = (id: string) => {
   router.push(`/analytics?sensor=${id}`)
 }
 
-const calibrateSensor = (id: string) => {
-  ElMessage.info(`Calibrate sensor: ${id}`)
-  // TODO: Implement calibration modal
+const calibrateSensor = async (id: string) => {
+  try {
+    await ElMessageBox.prompt(
+      'Enter calibration value',
+      'Calibrate Sensor',
+      {
+        confirmButtonText: 'Calibrate',
+        cancelButtonText: 'Cancel',
+        inputPattern: /^-?\d+\.?\d*$/,
+        inputErrorMessage: 'Please enter a valid number'
+      }
+    )
+
+    await sensorStore.calibrateSensor(id, {
+      calibrationDate: new Date(),
+      calibratedBy: 'Current User',
+      calibrationValue: 0,
+      notes: ''
+    })
+  } catch {
+    // User cancelled
+  }
 }
 
-const removeSensor = async () => {
+const removeSensor = async (id: string) => {
   try {
     await ElMessageBox.confirm(
-      'Are you sure you want to remove this sensor?',
+      'Are you sure you want to remove this sensor? This action cannot be undone.',
       'Confirm Removal',
       {
         confirmButtonText: 'Remove',
@@ -418,8 +590,8 @@ const removeSensor = async () => {
         type: 'warning',
       }
     )
-    ElMessage.success('Sensor removed successfully')
-    // TODO: Implement actual removal
+    
+    await sensorStore.deleteSensor(id)
   } catch {
     // User cancelled
   }
@@ -427,12 +599,10 @@ const removeSensor = async () => {
 
 // Lifecycle
 onMounted(async () => {
-  isLoading.value = true
-  await tankStore.fetchTanks()
-  // TODO: Fetch sensors from API
-  setTimeout(() => {
-    isLoading.value = false
-  }, 500)
+  await Promise.all([
+    tankStore.fetchTanks(),
+    sensorStore.fetchSensors()
+  ])
 })
 </script>
 
@@ -754,5 +924,21 @@ onMounted(async () => {
   50% {
     opacity: 0.5;
   }
+}
+
+.form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-4);
+
+  @media (max-width: 768px) {
+    grid-template-columns: 1fr;
+  }
+}
+
+.dialog-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-3);
 }
 </style>

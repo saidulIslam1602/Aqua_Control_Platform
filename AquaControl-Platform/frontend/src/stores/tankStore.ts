@@ -390,6 +390,50 @@ export const useTankStore = defineStore('tanks', () => {
     }
   }
 
+  const updateTankStatus = async (id: string, isActive: boolean): Promise<boolean> => {
+    const index = tanks.value.findIndex(t => t.id === id)
+    if (index === -1) return false
+
+    const originalTank = tanks.value[index]
+    const newStatus = isActive ? TankStatus.Active : TankStatus.Inactive
+
+    // Optimistic update
+    tanks.value[index] = {
+      ...originalTank,
+      status: newStatus,
+      isActive: isActive,
+      updatedAt: new Date().toISOString()
+    }
+
+    const rollback = () => {
+      tanks.value[index] = originalTank
+    }
+
+    try {
+      await tankService.updateTankStatus(id, isActive)
+
+      notificationStore.addNotification({
+        type: 'success',
+        title: 'Tank status updated',
+        message: `Tank "${originalTank.name}" is now ${isActive ? 'active' : 'inactive'}`
+      })
+
+      return true
+
+    } catch (error: any) {
+      // Rollback optimistic update
+      rollback()
+
+      state.value.error = error.message
+      notificationStore.addNotification({
+        type: 'error',
+        title: 'Failed to update tank status',
+        message: error.message
+      })
+      return false
+    }
+  }
+
   // Real-time updates
   const handleRealTimeUpdate = (event: any) => {
     switch (event.eventType) {
@@ -487,6 +531,7 @@ export const useTankStore = defineStore('tanks', () => {
     createTank,
     updateTank,
     deleteTank,
+    updateTankStatus,
     clearError,
     setSelectedTank,
     updateFilters,

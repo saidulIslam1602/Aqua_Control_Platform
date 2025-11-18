@@ -39,7 +39,7 @@
           <el-button
             type="primary"
             size="large"
-            :loading="isLoading"
+            :loading="authStore.isLoading"
             @click="handleLogin"
             style="width: 100%"
           >
@@ -62,7 +62,6 @@ const router = useRouter()
 const authStore = useAuthStore()
 
 const loginFormRef = ref<FormInstance>()
-const isLoading = ref(false)
 
 const loginForm = ref({
   username: '',
@@ -84,7 +83,6 @@ const handleLogin = async () => {
 
   await loginFormRef.value.validate(async (valid) => {
     if (valid) {
-      isLoading.value = true
       try {
         const success = await authStore.login({
           username: loginForm.value.username,
@@ -101,8 +99,6 @@ const handleLogin = async () => {
       } catch (error: any) {
         console.error('Login error:', error)
         ElMessage.error(error.response?.data?.message || error.message || 'Login failed')
-      } finally {
-        isLoading.value = false
       }
     }
   })

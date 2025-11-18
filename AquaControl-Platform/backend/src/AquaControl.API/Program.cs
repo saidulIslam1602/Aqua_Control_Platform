@@ -32,7 +32,7 @@ try
     builder.Services.AddApplicationServices();
     builder.Services.AddInfrastructureServices(builder.Configuration);
     builder.Services.AddAuthenticationServices(builder.Configuration);
-    builder.Services.AddCorsServices();
+    builder.Services.AddCorsServices(builder.Configuration);
     // Rate limiting will be added later with proper .NET 8 implementation
     builder.Services.AddHealthCheckServices(builder.Configuration);
     builder.Services.AddValidationServices();
@@ -64,17 +64,17 @@ try
     }
 
     // Add custom middleware (order matters!)
-    app.UseMiddleware<SecurityHeadersMiddleware>();
-    app.UseMiddleware<PerformanceMiddleware>();
     app.UseMiddleware<ExceptionHandlingMiddleware>();
     app.UseMiddleware<RequestLoggingMiddleware>();
+    app.UseMiddleware<SecurityHeadersMiddleware>();
+    app.UseMiddleware<PerformanceMiddleware>();
 
     app.UseHttpsRedirection();
     app.UseHsts(); // Add HSTS in production
     // Rate limiter will be added later
     
     // Use environment-specific CORS policy
-    var corsPolicy = app.Environment.IsDevelopment() ? "AllowAll" : "Production";
+    var corsPolicy = app.Environment.IsDevelopment() ? "Development" : "Production";
     app.UseCors(corsPolicy);
     
     app.UseAuthentication();

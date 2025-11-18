@@ -62,6 +62,8 @@ public class AuthenticationService : IAuthenticationService
             }
 
             var hashedPassword = HashPassword(password, user.Salt);
+            _logger.LogInformation("Password verification - Stored hash: {StoredHash}, Computed hash: {ComputedHash}, Match: {Match}", 
+                user.PasswordHash, hashedPassword, user.PasswordHash == hashedPassword);
             
             if (!user.VerifyPassword(password, hashedPassword))
             {
@@ -116,9 +118,11 @@ public class AuthenticationService : IAuthenticationService
 
     public async Task<bool> CreateDefaultAdminUserAsync()
     {
+        _logger.LogInformation("Starting CreateDefaultAdminUserAsync");
         try
         {
             // Check if admin user already exists
+            _logger.LogInformation("Checking if admin user already exists");
             var existingAdmin = await _userRepository.GetByUsernameAsync("admin");
             if (existingAdmin != null)
             {
@@ -126,9 +130,10 @@ public class AuthenticationService : IAuthenticationService
                 return true;
             }
 
+            _logger.LogInformation("Admin user not found, creating new admin user");
             // Create default admin user
             var salt = GenerateSalt();
-            var passwordHash = HashPassword("admin123", salt);
+            var passwordHash = HashPassword("Admin123", salt);
 
             var adminUser = new User(
                 username: "admin",
@@ -140,15 +145,20 @@ public class AuthenticationService : IAuthenticationService
                 roles: new[] { "Administrator", "User" }
             );
 
+            _logger.LogInformation("Adding admin user to repository");
             await _userRepository.AddAsync(adminUser);
-            await _unitOfWork.SaveChangesAsync();
+            
+            _logger.LogInformation("Saving changes to database");
+            var result = await _unitOfWork.SaveChangesAsync();
+            _logger.LogInformation("SaveChangesAsync returned: {Result}", result);
 
-            _logger.LogInformation("Default admin user created successfully");
+            _logger.LogInformation("Default admin user created successfully with ID: {UserId}", adminUser.Id);
             return true;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error creating default admin user");
+            _logger.LogError(ex, "Error creating default admin user: {Message}", ex.Message);
+            _logger.LogError(ex, "Stack trace: {StackTrace}", ex.StackTrace);
             return false;
         }
     }

@@ -144,7 +144,7 @@ public sealed class Tank : AggregateRoot<Guid>
     /// It does not raise any domain events, as it's used exclusively for event sourcing replay.
     /// The tank is created with minimal default values and will be fully populated by replaying events.
     /// </remarks>
-    internal static Tank FromEventReplay(Guid tankId)
+    public static Tank FromEventReplay(Guid tankId)
     {
         // Create tank using event replay constructor (does not raise events)
         // The state will be rebuilt by replaying events via When() methods

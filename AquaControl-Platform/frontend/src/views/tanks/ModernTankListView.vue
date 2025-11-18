@@ -246,6 +246,110 @@
         </div>
       </div>
     </section>
+
+    <!-- Create Tank Modal -->
+    <el-dialog
+      v-model="showCreateModal"
+      title="Create New Tank"
+      width="600px"
+      :close-on-click-modal="false"
+    >
+      <el-form
+        ref="tankFormRef"
+        :model="tankForm"
+        :rules="tankFormRules"
+        label-position="top"
+      >
+        <el-form-item label="Tank Name" prop="name">
+          <el-input
+            v-model="tankForm.name"
+            placeholder="Enter tank name"
+            size="large"
+          />
+        </el-form-item>
+
+        <el-form-item label="Tank Type" prop="tankType">
+          <el-select
+            v-model="tankForm.tankType"
+            placeholder="Select tank type"
+            size="large"
+            style="width: 100%"
+          >
+            <el-option label="Freshwater" value="Freshwater" />
+            <el-option label="Saltwater" value="Saltwater" />
+            <el-option label="Breeding" value="Breeding" />
+            <el-option label="Grow-out" value="GrowOut" />
+          </el-select>
+        </el-form-item>
+
+        <div class="form-row">
+          <el-form-item label="Capacity" prop="capacity">
+            <el-input
+              v-model.number="tankForm.capacity"
+              type="number"
+              placeholder="Enter capacity"
+              size="large"
+            />
+          </el-form-item>
+
+          <el-form-item label="Unit" prop="unit">
+            <el-select
+              v-model="tankForm.unit"
+              placeholder="Unit"
+              size="large"
+            >
+              <el-option label="Liters" value="L" />
+              <el-option label="Gallons" value="gal" />
+              <el-option label="Cubic Meters" value="m³" />
+            </el-select>
+          </el-form-item>
+        </div>
+
+        <div class="form-row">
+          <el-form-item label="Building" prop="building">
+            <el-input
+              v-model="tankForm.building"
+              placeholder="Building name"
+              size="large"
+            />
+          </el-form-item>
+
+          <el-form-item label="Room" prop="room">
+            <el-input
+              v-model="tankForm.room"
+              placeholder="Room number"
+              size="large"
+            />
+          </el-form-item>
+        </div>
+
+        <el-form-item label="Description">
+          <el-input
+            v-model="tankForm.description"
+            type="textarea"
+            :rows="3"
+            placeholder="Enter tank description (optional)"
+          />
+        </el-form-item>
+      </el-form>
+
+      <template #footer>
+        <div class="dialog-footer">
+          <button class="btn btn-outline" @click="closeCreateModal">Cancel</button>
+          <button class="btn btn-primary" @click="createTank" :disabled="isCreating">
+            <el-icon v-if="isCreating" class="is-loading"><Loading /></el-icon>
+            <span>{{ isCreating ? 'Creating...' : 'Create Tank' }}</span>
+          </button>
+        </div>
+      </template>
+    </el-dialog>
+
+    <!-- Schedule Maintenance Modal -->
+    <ScheduleMaintenanceModal
+      v-model="showMaintenanceModal"
+      :tank-id="selectedTankForMaintenance"
+      @scheduled="handleMaintenanceScheduled"
+    />
   </div>
 </template>
 
@@ -254,6 +358,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useTankStore } from '@/stores/tankStore'
 import ModernCard from '@/components/common/ModernCard.vue'
+import ScheduleMaintenanceModal from '@/components/modals/ScheduleMaintenanceModal.vue'
 import {
   Plus,
   Search,
@@ -272,6 +377,8 @@ import {
   View,
   ArrowRight
 } from '@element-plus/icons-vue'
+import { ElMessage } from 'element-plus'
+import type { FormInstance } from 'element-plus'
 
 // Router and Store
 const router = useRouter()
@@ -282,6 +389,46 @@ const searchTerm = ref('')
 const selectedType = ref('')
 const selectedStatus = ref<boolean | ''>('')
 const viewMode = ref<'grid' | 'list'>('grid')
+const showCreateModal = ref(false)
+const showMaintenanceModal = ref(false)
+const selectedTankForMaintenance = ref<string>('')
+const isCreating = ref(false)
+const tankFormRef = ref()
+
+// Tank form data
+const tankForm = ref({
+  name: '',
+  tankType: '',
+  capacity: 0,
+  unit: 'L',
+  building: '',
+  room: '',
+  description: ''
+})
+
+// Form validation rules
+const tankFormRules = {
+  name: [
+    { required: true, message: 'Please enter tank name', trigger: 'blur' },
+    { min: 3, max: 50, message: 'Name should be 3-50 characters', trigger: 'blur' }
+  ],
+  tankType: [
+    { required: true, message: 'Please select tank type', trigger: 'change' }
+  ],
+  capacity: [
+    { required: true, message: 'Please enter capacity', trigger: 'blur' },
+    { type: 'number', min: 1, message: 'Capacity must be greater than 0', trigger: 'blur' }
+  ],
+  unit: [
+    { required: true, message: 'Please select unit', trigger: 'change' }
+  ],
+  building: [
+    { required: true, message: 'Please enter building', trigger: 'blur' }
+  ],
+  room: [
+    { required: true, message: 'Please enter room', trigger: 'blur' }
+  ]
+}
 
 // Computed
 const filteredTanks = computed(() => {
@@ -337,23 +484,81 @@ const viewTankDetails = (id: string) => {
 }
 
 const showCreateTankModal = () => {
-  // TODO: Implement create tank modal
-  console.log('Create tank modal')
+  showCreateModal.value = true
+}
+
+const closeCreateModal = () => {
+  showCreateModal.value = false
+  tankFormRef.value?.resetFields()
+  tankForm.value = {
+    name: '',
+    tankType: '',
+    capacity: 0,
+    unit: 'L',
+    building: '',
+    room: '',
+    description: ''
+  }
+}
+
+const createTank = async () => {
+  if (!tankFormRef.value) return
+
+  await tankFormRef.value.validate(async (valid: boolean) => {
+    if (valid) {
+      isCreating.value = true
+      try {
+        await tankStore.createTank({
+          name: tankForm.value.name,
+          tankType: tankForm.value.tankType,
+          capacity: tankForm.value.capacity,
+          capacityUnit: tankForm.value.unit,
+          building: tankForm.value.building,
+          room: tankForm.value.room,
+          zone: '',
+          latitude: undefined,
+          longitude: undefined,
+          description: tankForm.value.description
+        })
+        
+        ElMessage.success('Tank created successfully')
+        closeCreateModal()
+      } catch (error: any) {
+        ElMessage.error(error.message || 'Failed to create tank')
+      } finally {
+        isCreating.value = false
+      }
+    }
+  })
 }
 
 const activateTank = async (id: string) => {
-  // TODO: Implement activate tank
-  console.log('Activate tank:', id)
+  try {
+    await tankStore.updateTankStatus(id, true)
+    ElMessage.success('Tank activated successfully')
+  } catch (error: any) {
+    ElMessage.error(error.message || 'Failed to activate tank')
+  }
 }
 
 const deactivateTank = async (id: string) => {
-  // TODO: Implement deactivate tank
-  console.log('Deactivate tank:', id)
+  try {
+    await tankStore.updateTankStatus(id, false)
+    ElMessage.success('Tank deactivated successfully')
+  } catch (error: any) {
+    ElMessage.error(error.message || 'Failed to deactivate tank')
+  }
 }
 
 const scheduleMaintenance = (id: string) => {
-  // TODO: Implement schedule maintenance
-  console.log('Schedule maintenance:', id)
+  selectedTankForMaintenance.value = id
+  showMaintenanceModal.value = true
+}
+
+const handleMaintenanceScheduled = (data: any) => {
+  console.log('Maintenance scheduled:', data)
+  // Optionally refresh tanks to show updated maintenance status
+  tankStore.refresh()
 }
 
 // Lifecycle
@@ -723,5 +928,21 @@ onMounted(async () => {
   50% {
     opacity: 0.5;
   }
+}
+
+.form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-4);
+
+  @media (max-width: 768px) {
+    grid-template-columns: 1fr;
+  }
+}
+
+.dialog-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-3);
 }
 </style>

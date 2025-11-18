@@ -18,9 +18,6 @@ public class PerformanceMiddleware
         var stopwatch = Stopwatch.StartNew();
         var requestId = Guid.NewGuid().ToString();
         
-        // Add request ID to response headers for tracing
-        context.Response.Headers["X-Request-ID"] = requestId;
-        
         // Add request ID to log context
         using (_logger.BeginScope(new Dictionary<string, object>
         {
@@ -30,6 +27,22 @@ public class PerformanceMiddleware
             ["QueryString"] = context.Request.QueryString.ToString()
         }))
         {
+            // Set headers before processing the request
+            context.Response.OnStarting(() =>
+            {
+                if (!context.Response.Headers.ContainsKey("X-Request-ID"))
+                {
+                    context.Response.Headers["X-Request-ID"] = requestId;
+                }
+                
+                if (!context.Response.Headers.ContainsKey("X-Response-Time"))
+                {
+                    context.Response.Headers["X-Response-Time"] = $"{stopwatch.ElapsedMilliseconds}ms";
+                }
+                
+                return Task.CompletedTask;
+            });
+
             try
             {
                 await _next(context);
@@ -56,9 +69,6 @@ public class PerformanceMiddleware
                         context.Request.Path,
                         elapsed);
                 }
-
-                // Add performance header
-                context.Response.Headers["X-Response-Time"] = $"{elapsed}ms";
             }
         }
     }

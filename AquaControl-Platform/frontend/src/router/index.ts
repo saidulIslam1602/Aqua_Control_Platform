@@ -7,6 +7,7 @@ const DashboardView = () => import('@/views/dashboard/ModernDashboardView.vue')
 const TanksView = () => import('@/views/tanks/ModernTankListView.vue')
 const TankDetailView = () => import('@/views/tanks/ModernTankDetailView.vue')
 const SensorsView = () => import('@/views/sensors/ModernSensorsView.vue')
+const SensorDetailView = () => import('@/views/sensors/ModernSensorDetailView.vue')
 const AnalyticsView = () => import('@/views/analytics/ModernAnalyticsView.vue')
 const SettingsView = () => import('@/views/settings/ModernSettingsView.vue')
 const NotFoundView = () => import('@/views/common/NotFoundView.vue')
@@ -41,6 +42,13 @@ const routes: RouteRecordRaw[] = [
     name: 'Sensors',
     component: SensorsView,
     meta: { requiresAuth: true, title: 'Sensors' }
+  },
+  {
+    path: '/sensors/:id',
+    name: 'SensorDetail',
+    component: SensorDetailView,
+    meta: { requiresAuth: true, title: 'Sensor Details' },
+    props: true
   },
   {
     path: '/analytics',

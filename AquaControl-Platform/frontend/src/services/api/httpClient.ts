@@ -14,7 +14,9 @@ class HttpClient {
   private readonly timeout: number = 30000
 
   constructor() {
-    this.baseURL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'
+    // In development with Docker, use empty base URL to rely on Vite proxy
+    // In production, use the full API URL
+    this.baseURL = import.meta.env.VITE_API_BASE_URL || ''
     
     this.client = axios.create({
       baseURL: this.baseURL,

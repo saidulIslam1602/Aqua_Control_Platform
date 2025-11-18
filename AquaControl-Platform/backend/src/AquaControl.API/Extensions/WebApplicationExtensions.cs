@@ -30,10 +30,14 @@ public static class WebApplicationExtensions
             await timeSeriesContext.Database.EnsureCreatedAsync();
             
             // Initialize TimescaleDB
+            logger.LogInformation("Initializing TimescaleDB...");
             await DatabaseInitializer.InitializeAsync(scope.ServiceProvider);
+            logger.LogInformation("TimescaleDB initialization completed");
             
             // Create default admin user
-            await authService.CreateDefaultAdminUserAsync();
+            logger.LogInformation("Creating default admin user...");
+            var adminUserResult = await authService.CreateDefaultAdminUserAsync();
+            logger.LogInformation("Default admin user creation result: {Result}", adminUserResult);
             
             logger.LogInformation("Database initialization completed successfully");
         }

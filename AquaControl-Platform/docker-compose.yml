@@ -19,7 +19,7 @@ services:
       POSTGRES_WORK_MEM: 16MB
       POSTGRES_MAINTENANCE_WORK_MEM: 128MB
     ports:
-      - "5432:5432"
+      - "5433:5432"
     volumes:
       - timescale_data:/var/lib/postgresql/data
       - ./docker/scripts/init-timescale.sql:/docker-entrypoint-initdb.d/01-init-timescale.sql

@@ -1,0 +1,134 @@
+version: '3.8'
+
+services:
+  # ===========================================
+  # Infrastructure Services
+  # ===========================================
+  
+  # PostgreSQL with TimescaleDB
+  timescaledb:
+    image: timescale/timescaledb:latest-pg15
+    container_name: aquacontrol-timescaledb-dev
+    restart: unless-stopped
+    environment:
+      - POSTGRES_DB=aquacontrol_dev
+      - POSTGRES_USER=aquacontrol
+      - POSTGRES_PASSWORD=AquaControl123!
+      - TIMESCALEDB_TELEMETRY=off
+    ports:
+      - "5433:5432"
+    volumes:
+      - timescaledb_data_dev:/var/lib/postgresql/data
+      - ./data-engineering/timescaledb/init-scripts:/docker-entrypoint-initdb.d
+      - ./data-engineering/timescaledb/config/postgresql.conf:/etc/postgresql/postgresql.conf
+    networks:
+      - aquacontrol-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U aquacontrol -d aquacontrol_dev"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: aquacontrol-redis-dev
+    restart: unless-stopped
+    ports:
+      - "6381:6379"
+    volumes:
+      - redis_data_dev:/data
+      - ./docker/configs/redis/redis.conf:/usr/local/etc/redis/redis.conf
+    networks:
+      - aquacontrol-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  # Backend API
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.dev
+    container_name: aquacontrol-backend-dev
+    restart: unless-stopped
+    environment:
+      # ASP.NET Core settings
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://+:5000
+      - ASPNETCORE_LOGGING__LOGLEVEL__DEFAULT=Information
+      
+      # Database connections
+      - ConnectionStrings__DefaultConnection=Host=timescaledb;Port=5432;Database=aquacontrol_dev;Username=aquacontrol;Password=AquaControl123!;Include Error Detail=true
+      - ConnectionStrings__Redis=redis:6379
+      
+      # JWT settings
+      - JwtSettings__SecretKey=dev-jwt-secret-key-that-is-at-least-64-characters-long-for-development-purposes
+      - JwtSettings__Issuer=AquaControl.API
+      - JwtSettings__Audience=AquaControl.Client
+      - JwtSettings__ExpirationMinutes=60
+      
+      # CORS settings
+      - Cors__AllowedOrigins__0=http://localhost:5173
+      - Cors__AllowedOrigins__1=http://localhost:3000
+      - Cors__AllowedOrigins__2=http://frontend:5173
+    ports:
+      - "5000:5000"
+    depends_on:
+      timescaledb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - aquacontrol-network
+    volumes:
+      - ./backend:/app/source
+      - backend_logs_dev:/app/logs
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+  # Frontend Application
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+    container_name: aquacontrol-frontend-dev
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=development
+      - VITE_API_BASE_URL=http://localhost:5000
+      - VITE_WS_URL=ws://localhost:5000
+    ports:
+      - "5173:5173"
+    depends_on:
+      - backend
+    networks:
+      - aquacontrol-network
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+      - /app/dist
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5173"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+volumes:
+  timescaledb_data_dev:
+    driver: local
+  redis_data_dev:
+    driver: local
+  backend_logs_dev:
+    driver: local
+
+networks:
+  aquacontrol-network:
+    driver: bridge
+    name: aquacontrol-dev-network

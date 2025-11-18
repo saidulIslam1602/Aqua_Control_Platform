@@ -46,6 +46,8 @@ public class User : AggregateRoot<Guid>
 
     public bool VerifyPassword(string password, string providedHash)
     {
+        // Compare the provided hash with the stored password hash
+        // The providedHash should be computed using the same salt and hashing algorithm
         return PasswordHash == providedHash;
     }
 

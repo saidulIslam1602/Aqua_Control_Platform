@@ -614,15 +614,25 @@ const confirmDeleteAccount = async () => {
 
 .modern-settings-view {
   min-height: 100vh;
-  background: var(--color-neutral-50);
+  background: #f8f9fa;
 }
 
 .page-header {
-  background: linear-gradient(135deg, var(--color-primary-50), var(--color-secondary-50));
+  background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%);
+  padding: var(--space-8) 0;
 
   .header-content {
     .header-text {
       max-width: 600px;
+
+      h1 {
+        color: white !important;
+        margin-bottom: var(--space-3);
+      }
+
+      p {
+        color: rgba(255, 255, 255, 0.9) !important;
+      }
     }
   }
 }
@@ -668,7 +678,7 @@ const confirmDeleteAccount = async () => {
     background: transparent;
     border: none;
     border-radius: var(--border-radius-md);
-    color: var(--color-text-secondary);
+    color: #6b7280;
     font-size: var(--font-size-base);
     cursor: pointer;
     transition: all var(--transition-fast);
@@ -680,13 +690,13 @@ const confirmDeleteAccount = async () => {
     }
 
     &:hover {
-      background: var(--color-neutral-50);
-      color: var(--color-text-primary);
+      background: #f3f4f6;
+      color: #111827;
     }
 
     &.active {
-      background: var(--color-primary-50);
-      color: var(--color-primary-600);
+      background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+      color: #1e40af;
       font-weight: var(--font-weight-semibold);
     }
   }
@@ -701,13 +711,13 @@ const confirmDeleteAccount = async () => {
     h3 {
       font-size: var(--font-size-xl);
       font-weight: var(--font-weight-semibold);
-      color: var(--color-text-primary);
+      color: #111827;
       margin: 0 0 var(--space-1);
     }
 
     .card-subtitle {
       font-size: var(--font-size-sm);
-      color: var(--color-text-tertiary);
+      color: #6b7280;
       margin: 0;
     }
   }
@@ -771,7 +781,7 @@ const confirmDeleteAccount = async () => {
   label {
     font-size: var(--font-size-sm);
     font-weight: var(--font-weight-medium);
-    color: var(--color-text-secondary);
+    color: #374151;
   }
 }
 
@@ -808,13 +818,13 @@ const confirmDeleteAccount = async () => {
     h4 {
       font-size: var(--font-size-base);
       font-weight: var(--font-weight-semibold);
-      color: var(--color-text-primary);
+      color: #111827;
       margin: 0 0 var(--space-1);
     }
 
     p {
       font-size: var(--font-size-sm);
-      color: var(--color-text-tertiary);
+      color: #6b7280;
       margin: 0;
     }
   }
@@ -830,7 +840,7 @@ const confirmDeleteAccount = async () => {
   h4 {
     font-size: var(--font-size-base);
     font-weight: var(--font-weight-semibold);
-    color: var(--color-text-primary);
+    color: #111827;
     margin: 0 0 var(--space-4);
   }
 }
@@ -851,13 +861,13 @@ const confirmDeleteAccount = async () => {
       display: block;
       font-size: var(--font-size-base);
       font-weight: var(--font-weight-medium);
-      color: var(--color-text-primary);
+      color: #111827;
       margin-bottom: var(--space-1);
     }
 
     small {
       font-size: var(--font-size-sm);
-      color: var(--color-text-tertiary);
+      color: #6b7280;
     }
   }
 }
@@ -911,13 +921,13 @@ const confirmDeleteAccount = async () => {
       font-size: var(--font-size-3xl);
       font-weight: var(--font-weight-bold);
       font-family: var(--font-family-display);
-      color: var(--color-text-primary);
+      color: #111827;
       margin: 0 0 var(--space-2);
     }
 
     .version {
       font-size: var(--font-size-base);
-      color: var(--color-text-tertiary);
+      color: #6b7280;
     }
   }
 
@@ -937,7 +947,7 @@ const confirmDeleteAccount = async () => {
       .info-label {
         display: block;
         font-size: var(--font-size-xs);
-        color: var(--color-text-tertiary);
+        color: #9ca3af;
         margin-bottom: var(--space-1);
         text-transform: uppercase;
         letter-spacing: 0.05em;
@@ -947,7 +957,7 @@ const confirmDeleteAccount = async () => {
         display: block;
         font-size: var(--font-size-base);
         font-weight: var(--font-weight-semibold);
-        color: var(--color-text-primary);
+        color: #111827;
       }
     }
   }
@@ -967,7 +977,7 @@ const confirmDeleteAccount = async () => {
 
     p {
       font-size: var(--font-size-sm);
-      color: var(--color-text-tertiary);
+      color: #6b7280;
       margin: var(--space-2) 0;
     }
   }

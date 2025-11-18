@@ -11,3 +11,16 @@
 /home/saidul/Desktop/AquaCulturePlatform/AquaControl-Platform/backend/src/AquaControl.Domain/obj/Debug/net8.0/refint/AquaControl.Domain.dll
 /home/saidul/Desktop/AquaCulturePlatform/AquaControl-Platform/backend/src/AquaControl.Domain/obj/Debug/net8.0/AquaControl.Domain.pdb
 /home/saidul/Desktop/AquaCulturePlatform/AquaControl-Platform/backend/src/AquaControl.Domain/obj/Debug/net8.0/ref/AquaControl.Domain.dll
+/home/saidul/Desktop/Portfolio/AquaCulturePlatform/AquaControl-Platform/backend/src/AquaControl.Domain/bin/Debug/net8.0/AquaControl.Domain.deps.json
+/home/saidul/Desktop/Portfolio/AquaCulturePlatform/AquaControl-Platform/backend/src/AquaControl.Domain/bin/Debug/net8.0/AquaControl.Domain.dll
+/home/saidul/Desktop/Portfolio/AquaCulturePlatform/AquaControl-Platform/backend/src/AquaControl.Domain/bin/Debug/net8.0/AquaControl.Domain.pdb
+/home/saidul/Desktop/Portfolio/AquaCulturePlatform/AquaControl-Platform/backend/src/AquaControl.Domain/obj/Debug/net8.0/AquaControl.Domain.csproj.AssemblyReference.cache
+/home/saidul/Desktop/Portfolio/AquaCulturePlatform/AquaControl-Platform/backend/src/AquaControl.Domain/obj/Debug/net8.0/AquaControl.Domain.GeneratedMSBuildEditorConfig.editorconfig
+/home/saidul/Desktop/Portfolio/AquaCulturePlatform/AquaControl-Platform/backend/src/AquaControl.Domain/obj/Debug/net8.0/AquaControl.Domain.AssemblyInfoInputs.cache
+/home/saidul/Desktop/Portfolio/AquaCulturePlatform/AquaControl-Platform/backend/src/AquaControl.Domain/obj/Debug/net8.0/AquaControl.Domain.AssemblyInfo.cs
+/home/saidul/Desktop/Portfolio/AquaCulturePlatform/AquaControl-Platform/backend/src/AquaControl.Domain/obj/Debug/net8.0/AquaControl.Domain.csproj.CoreCompileInputs.cache
+/home/saidul/Desktop/Portfolio/AquaCulturePlatform/AquaControl-Platform/backend/src/AquaControl.Domain/obj/Debug/net8.0/AquaControl.Domain.sourcelink.json
+/home/saidul/Desktop/Portfolio/AquaCulturePlatform/AquaControl-Platform/backend/src/AquaControl.Domain/obj/Debug/net8.0/AquaControl.Domain.dll
+/home/saidul/Desktop/Portfolio/AquaCulturePlatform/AquaControl-Platform/backend/src/AquaControl.Domain/obj/Debug/net8.0/refint/AquaControl.Domain.dll
+/home/saidul/Desktop/Portfolio/AquaCulturePlatform/AquaControl-Platform/backend/src/AquaControl.Domain/obj/Debug/net8.0/AquaControl.Domain.pdb
+/home/saidul/Desktop/Portfolio/AquaCulturePlatform/AquaControl-Platform/backend/src/AquaControl.Domain/obj/Debug/net8.0/ref/AquaControl.Domain.dll
