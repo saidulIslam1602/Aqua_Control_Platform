@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import type { Alert, AlertSeverity, AlertType } from '@/types/domain'
+import type { Alert, AlertSeverity } from '@/types/domain'
 
 export const useAlertStore = defineStore('alerts', () => {
   // State

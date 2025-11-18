@@ -399,7 +399,6 @@ import {
   CircleCheck,
   DocumentCopy,
   QuestionFilled,
-  Thermometer,
   Odometer,
   Aim
 } from '@element-plus/icons-vue'
@@ -449,7 +448,7 @@ const getSensorTagType = (status: string) => {
 
 const getSensorIcon = (type: string) => {
   const iconMap: Record<string, any> = {
-    Temperature: Thermometer,
+    Temperature: Odometer,
     pH: Odometer,
     Oxygen: Aim,
     default: Monitor

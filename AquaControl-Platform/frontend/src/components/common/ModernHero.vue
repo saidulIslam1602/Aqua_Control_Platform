@@ -36,9 +36,9 @@
       
       <!-- Animated particles/bubbles effect -->
       <div class="hero-particles">
-        <div v-for="i in 20" :key="i" class="particle" :style="getParticleStyle(i)"></div>
+        <div v-for="i in 20" :key="i" class="particle" :style="getParticleStyle()"></div>
       </div>
-    </div>
+      
       <div class="gradient-overlay"></div>
       <div class="animated-shapes">
         <div class="shape shape-1"></div>
@@ -109,7 +109,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { onMounted } from 'vue'
 import { ArrowRight, VideoPlay } from '@element-plus/icons-vue'
 
 // Props
@@ -127,7 +127,7 @@ interface Props {
   overlayLight?: boolean
 }
 
-const props = withDefaults(defineProps<Props>(), {
+withDefaults(defineProps<Props>(), {
   badgeText: 'Pioneering Smart Aquaculture',
   primaryButtonText: 'Get Started',
   secondaryButtonText: 'Watch Demo',
@@ -154,7 +154,7 @@ const handleSecondaryAction = () => {
 }
 
 // Particle animation helper
-const getParticleStyle = (index: number) => {
+const getParticleStyle = () => {
   const delay = Math.random() * 5
   const duration = 8 + Math.random() * 12
   const size = 4 + Math.random() * 8
@@ -290,6 +290,25 @@ onMounted(() => {
       }
     }
   }
+
+  .gradient-overlay {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(180deg, transparent 0%, rgba(0, 0, 0, 0.2) 100%);
+    pointer-events: none;
+  }
+
+  .animated-shapes {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+    pointer-events: none;
+
+    .shape {
+      position: absolute;
+      border-radius: 50%;
+      opacity: 0.1;
+      filter: blur(60px);
       animation: float 20s ease-in-out infinite;
 
       &-1 {
@@ -560,6 +579,18 @@ onMounted(() => {
 }
 
 // Performance-optimized animations
+@keyframes float {
+  0%, 100% {
+    transform: translate(0, 0);
+  }
+  33% {
+    transform: translate(30px, -30px);
+  }
+  66% {
+    transform: translate(-20px, 20px);
+  }
+}
+
 @keyframes floatUp {
   0% {
     transform: translateY(0) translateX(0) scale(1);
@@ -606,46 +637,5 @@ onMounted(() => {
   transform: translateZ(0);
   backface-visibility: hidden;
   perspective: 1000px;
-}
-
-
-  .scroll-icon {
-    width: 24px;
-    height: 40px;
-    border: 2px solid var(--color-text-tertiary);
-    border-radius: 12px;
-    display: flex;
-    justify-content: center;
-    padding-top: 8px;
-
-    span {
-      width: 4px;
-      height: 8px;
-      background-color: var(--color-text-tertiary);
-      border-radius: 2px;
-      animation: scroll-down 2s infinite;
-    }
-  }
-
-  .scroll-text {
-    font-size: var(--font-size-xs);
-    color: var(--color-text-tertiary);
-    text-transform: uppercase;
-    letter-spacing: 0.1em;
-  }
-}
-
-@keyframes scroll-down {
-  0% {
-    opacity: 0;
-    transform: translateY(0);
-  }
-  50% {
-    opacity: 1;
-  }
-  100% {
-    opacity: 0;
-    transform: translateY(12px);
-  }
 }
 </style>

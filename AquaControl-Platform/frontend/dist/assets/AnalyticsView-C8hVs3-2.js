@@ -1,2 +1,0 @@
-import{_ as o}from"./index-BgEO1XDn.js";import{z as s,A as c,B as e}from"./vue-vendor-DU8T2215.js";import"./ui-vendor-BVGsLsDI.js";import"./utils-vendor-8BWg7NFy.js";const n={},a={class:"analytics-view"};function i(r,t){return c(),s("div",a,[...t[0]||(t[0]=[e("h1",null,"Analytics",-1),e("p",null,"Analytics view coming soon...",-1)])])}const p=o(n,[["render",i],["__scopeId","data-v-6ca1f0cd"]]);export{p as default};
-//# sourceMappingURL=AnalyticsView-C8hVs3-2.js.map

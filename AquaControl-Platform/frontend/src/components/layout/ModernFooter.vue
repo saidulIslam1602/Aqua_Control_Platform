@@ -137,7 +137,7 @@ interface Props {
   email?: string
 }
 
-const props = withDefaults(defineProps<Props>(), {
+withDefaults(defineProps<Props>(), {
   companyName: 'AquaControl Platform',
   companyDescription: 'Advanced aquaculture management system providing real-time monitoring, analytics, and control for modern fish farming operations.',
   address: '123 Innovation Drive, Tech City, TC 12345',

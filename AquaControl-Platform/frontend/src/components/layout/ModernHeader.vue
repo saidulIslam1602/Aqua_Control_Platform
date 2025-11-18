@@ -110,7 +110,6 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/authStore'
-import { useNotificationStore } from '@/stores/notificationStore'
 import { 
   Search, 
   Bell, 
@@ -127,7 +126,6 @@ import {
 const router = useRouter()
 const route = useRoute()
 const authStore = useAuthStore()
-const notificationStore = useNotificationStore()
 
 // State
 const isScrolled = ref(false)
@@ -144,12 +142,12 @@ const navigationItems = [
 
 // Computed
 const userName = computed(() => authStore.user?.firstName || 'User')
-const userAvatar = computed(() => authStore.user?.avatar || '')
+const userAvatar = computed(() => '')
 const userInitials = computed(() => {
   const name = userName.value
   return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
 })
-const notificationCount = computed(() => notificationStore.unreadCount)
+const notificationCount = computed(() => 0)
 
 // Methods
 const handleScroll = () => {

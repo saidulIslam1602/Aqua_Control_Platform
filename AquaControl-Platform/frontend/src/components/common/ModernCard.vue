@@ -59,7 +59,6 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
 import { ArrowRight } from '@element-plus/icons-vue'
 import type { Component } from 'vue'
 

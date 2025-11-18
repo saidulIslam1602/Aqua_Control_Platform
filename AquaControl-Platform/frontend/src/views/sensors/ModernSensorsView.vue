@@ -217,7 +217,7 @@
                 </button>
                 <button 
                   class="action-btn action-btn--danger" 
-                  @click="removeSensor(sensor.id)"
+                  @click="removeSensor()"
                   title="Remove"
                 >
                   <el-icon><Delete /></el-icon>
@@ -252,7 +252,6 @@ import {
   TrendCharts,
   Setting,
   Delete,
-  Thermometer,
   Odometer,
   Aim,
   Histogram,
@@ -360,7 +359,7 @@ const offlineSensors = computed(() => mockSensors.value.filter(s => s.status ===
 // Methods
 const getSensorIcon = (type: string) => {
   const iconMap: Record<string, any> = {
-    Temperature: Thermometer,
+    Temperature: Odometer,
     pH: Odometer,
     Oxygen: Aim,
     Salinity: Compass,
@@ -408,7 +407,7 @@ const calibrateSensor = (id: string) => {
   // TODO: Implement calibration modal
 }
 
-const removeSensor = async (id: string) => {
+const removeSensor = async () => {
   try {
     await ElMessageBox.confirm(
       'Are you sure you want to remove this sensor?',
