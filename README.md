@@ -163,10 +163,6 @@ AquaControl Platform is a full-stack aquaculture management solution designed fo
    - **API Documentation**: http://localhost:5000/swagger
    - **Health Check**: http://localhost:5000/health
 
-### Default Credentials
-- **Username**: `admin`
-- **Password**: `Admin123` (note: case-sensitive, requires uppercase, lowercase, and digit)
-
 ## Service Endpoints
 
 | Service | URL | Description |
