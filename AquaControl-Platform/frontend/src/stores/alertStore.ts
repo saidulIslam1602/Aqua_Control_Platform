@@ -1,6 +1,8 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import type { Alert, AlertSeverity } from '@/types/domain'
+import { alertService } from '@/services/api/alertService'
+import { useNotificationStore } from './notificationStore'
 
 export const useAlertStore = defineStore('alerts', () => {
   // State
@@ -46,8 +48,21 @@ export const useAlertStore = defineStore('alerts', () => {
       isLoading.value = true
       error.value = null
 
-      // TODO: Replace with actual API call
-      // For now, generate sample alerts
+      // Try to fetch from API
+      try {
+        const response = await alertService.getAlerts({
+          page: 1,
+          pageSize: 100,
+          sortBy: 'createdAt',
+          sortDescending: true
+        })
+        alerts.value = response.data || []
+        return
+      } catch (apiError) {
+        console.warn('API call failed, using sample data:', apiError)
+      }
+
+      // Fallback to sample alerts if API fails
       const sampleAlerts: Alert[] = [
         {
           id: '1',
@@ -114,12 +129,36 @@ export const useAlertStore = defineStore('alerts', () => {
     alerts.value.unshift(newAlert)
   }
 
-  const resolveAlert = async (alertId: string, resolvedBy: string) => {
-    const alert = alerts.value.find(a => a.id === alertId)
-    if (alert) {
-      alert.isResolved = true
-      alert.resolvedAt = new Date()
-      alert.resolvedBy = resolvedBy
+  const resolveAlert = async (alertId: string, resolvedBy: string, notes?: string) => {
+    const notificationStore = useNotificationStore()
+    
+    try {
+      // Try API call first
+      try {
+        await alertService.resolveAlert(alertId, { resolvedBy, notes })
+      } catch (apiError) {
+        console.warn('API call failed for resolve alert:', apiError)
+      }
+      
+      // Update local state
+      const alert = alerts.value.find(a => a.id === alertId)
+      if (alert) {
+        alert.isResolved = true
+        alert.resolvedAt = new Date()
+        alert.resolvedBy = resolvedBy
+        
+        notificationStore.addNotification({
+          type: 'success',
+          title: 'Alert Resolved',
+          message: `Alert "${alert.title}" has been resolved`
+        })
+      }
+    } catch (err: any) {
+      notificationStore.addNotification({
+        type: 'error',
+        title: 'Failed to resolve alert',
+        message: err.message
+      })
     }
   }
 

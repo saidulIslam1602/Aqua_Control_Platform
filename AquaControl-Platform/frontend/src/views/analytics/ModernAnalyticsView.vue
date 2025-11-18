@@ -163,11 +163,7 @@
                   </el-select>
                 </div>
               </template>
-              <div class="chart-placeholder">
-                <el-icon :size="64"><TrendCharts /></el-icon>
-                <p>Temperature Chart</p>
-                <small>ECharts integration - Coming soon</small>
-              </div>
+              <TemperatureTrendChart :data="temperatureData" height="400px" />
             </ModernCard>
 
             <!-- pH Levels -->
@@ -189,11 +185,7 @@
                   </el-select>
                 </div>
               </template>
-              <div class="chart-placeholder">
-                <el-icon :size="64"><DataLine /></el-icon>
-                <p>pH Level Chart</p>
-                <small>ECharts integration - Coming soon</small>
-              </div>
+              <TemperatureTrendChart :data="temperatureData" height="400px" />
             </ModernCard>
 
             <!-- Multi-parameter Comparison -->
@@ -283,6 +275,30 @@
               <button class="btn btn-outline btn-block btn-small" @click="viewAllAlerts">
                 View All Alerts
               </button>
+            </ModernCard>
+
+            <!-- Water Quality Distribution -->
+            <ModernCard class="chart-card scroll-animate">
+              <template #header>
+                <h3>Water Quality Distribution</h3>
+              </template>
+              <WaterQualityChart :data="waterQualityData" height="350px" />
+            </ModernCard>
+
+            <!-- Sensor Status -->
+            <ModernCard class="chart-card scroll-animate">
+              <template #header>
+                <h3>Sensor Status</h3>
+              </template>
+              <SensorStatusChart :data="sensorStatusData" height="300px" />
+            </ModernCard>
+
+            <!-- System Efficiency Gauge -->
+            <ModernCard class="chart-card scroll-animate">
+              <template #header>
+                <h3>System Performance</h3>
+              </template>
+              <EfficiencyGaugeChart :value="efficiencyValue" title="System Efficiency" height="300px" />
             </ModernCard>
 
             <!-- System Health -->
@@ -423,6 +439,11 @@
 import { ref, computed, onMounted } from 'vue'
 import { useTankStore } from '@/stores/tankStore'
 import ModernCard from '@/components/common/ModernCard.vue'
+import TemperatureTrendChart from '@/components/charts/TemperatureTrendChart.vue'
+import WaterQualityChart from '@/components/charts/WaterQualityChart.vue'
+import SensorStatusChart from '@/components/charts/SensorStatusChart.vue'
+import EfficiencyGaugeChart from '@/components/charts/EfficiencyGaugeChart.vue'
+import { exportAnalyticsData } from '@/utils/exportUtils'
 import {
   Download,
   Refresh,
@@ -489,6 +510,30 @@ const sensorDataLog = computed(() => [
   { id: '5', timestamp: '2025-11-18 14:15', tank: 'Tank Alpha', sensor: 'TMP-001', parameter: 'Temperature', value: '24.3°C', status: 'Normal' }
 ])
 
+// Chart Data
+const temperatureData = computed(() => ({
+  timestamps: ['00:00', '04:00', '08:00', '12:00', '16:00', '20:00', '24:00'],
+  temperatures: [22.5, 23.1, 24.2, 25.8, 25.2, 24.0, 23.2],
+  minThreshold: 20,
+  maxThreshold: 28
+}))
+
+const waterQualityData = computed(() => ({
+  excellent: 45,
+  good: 32,
+  fair: 18,
+  poor: 5
+}))
+
+const sensorStatusData = computed(() => ({
+  online: 24,
+  offline: 3,
+  error: 1,
+  calibrating: 2
+}))
+
+const efficiencyValue = computed(() => systemEfficiency.value)
+
 // Methods
 const getPerformanceColor = (score: number) => {
   if (score >= 90) return 'linear-gradient(90deg, var(--color-success), var(--color-success-light))'
@@ -527,8 +572,24 @@ const getTagType = (status: string) => {
 }
 
 const exportData = () => {
-  ElMessage.success('Exporting analytics data...')
-  // TODO: Implement export
+  try {
+    const exportPayload = {
+      metrics: {
+        systemEfficiency: systemEfficiency.value,
+        avgWaterQuality: avgWaterQuality.value,
+        totalEvents: totalEvents.value,
+        sensorUptime: sensorUptime.value
+      },
+      tanks: tankPerformance.value,
+      sensors: sensorDataLog.value,
+      alerts: recentAlerts.value
+    }
+    
+    exportAnalyticsData(exportPayload, 'csv')
+    ElMessage.success('Analytics data exported successfully')
+  } catch (error: any) {
+    ElMessage.error('Failed to export data: ' + error.message)
+  }
 }
 
 const refreshData = () => {

@@ -366,14 +366,22 @@
         <span>Back to Tanks</span>
       </button>
     </div>
+
+    <!-- Edit Tank Modal -->
+    <EditTankModal
+      v-model="showEditModal"
+      :tank="tank"
+      @updated="handleTankUpdated"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useTankStore } from '@/stores/tankStore'
 import ModernCard from '@/components/common/ModernCard.vue'
+import EditTankModal from '@/components/modals/EditTankModal.vue'
 import {
   Loading,
   WarningFilled,
@@ -489,9 +497,16 @@ const retryLoad = async () => {
   }
 }
 
+const showEditModal = ref(false)
+
 const editTank = () => {
-  console.log('Edit tank')
-  // TODO: Implement edit modal
+  showEditModal.value = true
+}
+
+const handleTankUpdated = () => {
+  if (tank.value) {
+    tankStore.fetchTankById(tank.value.id)
+  }
 }
 
 const scheduleMaintenance = () => {
