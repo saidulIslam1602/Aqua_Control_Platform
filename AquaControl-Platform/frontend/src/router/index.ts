@@ -2,14 +2,13 @@ import { createRouter, createWebHistory } from 'vue-router'
 import { useAuthStore } from '@/stores/authStore'
 import type { RouteRecordRaw } from 'vue-router'
 
-// Lazy load components
-const DashboardView = () => import('@/views/dashboard/DashboardView.vue')
-const ModernDashboardView = () => import('@/views/dashboard/ModernDashboardView.vue')
-const TanksView = () => import('@/views/TankList.vue')
-const TankDetailView = () => import('@/views/TankDetail.vue')
-const SensorsView = () => import('@/views/sensor/SensorsView.vue')
-const AnalyticsView = () => import('@/views/analytics/AnalyticsView.vue')
-const SettingsView = () => import('@/views/settings/SettingsView.vue')
+// Lazy load components - All Modern Views
+const DashboardView = () => import('@/views/dashboard/ModernDashboardView.vue')
+const TanksView = () => import('@/views/tanks/ModernTankListView.vue')
+const TankDetailView = () => import('@/views/tanks/ModernTankDetailView.vue')
+const SensorsView = () => import('@/views/sensors/ModernSensorsView.vue')
+const AnalyticsView = () => import('@/views/analytics/ModernAnalyticsView.vue')
+const SettingsView = () => import('@/views/settings/ModernSettingsView.vue')
 const NotFoundView = () => import('@/views/common/NotFoundView.vue')
 
 const routes: RouteRecordRaw[] = [
@@ -23,12 +22,6 @@ const routes: RouteRecordRaw[] = [
     name: 'Dashboard',
     component: DashboardView,
     meta: { requiresAuth: true, title: 'Dashboard' }
-  },
-  {
-    path: '/modern-dashboard',
-    name: 'ModernDashboard',
-    component: ModernDashboardView,
-    meta: { requiresAuth: true, title: 'Modern Dashboard' }
   },
   {
     path: '/tanks',

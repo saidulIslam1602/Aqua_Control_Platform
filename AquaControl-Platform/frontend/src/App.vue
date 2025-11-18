@@ -9,9 +9,9 @@
     <template v-else>
       <!-- Authentication wrapper -->
       <template v-if="authStore.isAuthenticated">
-        <AppLayout>
+        <ModernLayout>
           <router-view />
-        </AppLayout>
+        </ModernLayout>
       </template>
       
       <!-- Login page -->
@@ -33,7 +33,7 @@ import { ref, onMounted, provide } from 'vue'
 import { useAuthStore } from '@/stores/authStore'
 import { useRealTimeStore } from '@/stores/realTimeStore'
 import { useNotificationStore } from '@/stores/notificationStore'
-import AppLayout from '@/components/layout/AppLayout.vue'
+import ModernLayout from '@/components/layout/ModernLayout.vue'
 import LoginView from '@/views/auth/LoginView.vue'
 import NotificationContainer from '@/components/common/NotificationContainer.vue'
 import ConnectionStatus from '@/components/common/ConnectionStatus.vue'

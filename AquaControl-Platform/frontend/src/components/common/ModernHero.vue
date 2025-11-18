@@ -1,6 +1,44 @@
 <template>
-  <section class="modern-hero">
+  <section class="modern-hero" :class="{ 'has-video': videoUrl }">
+    <!-- Background Media -->
     <div class="hero-background">
+      <!-- Video Background -->
+      <video 
+        v-if="videoUrl"
+        class="hero-video"
+        autoplay
+        muted
+        loop
+        playsinline
+        :poster="backgroundImage"
+      >
+        <source :src="videoUrl" type="video/mp4" />
+      </video>
+      
+      <!-- Image Background -->
+      <div 
+        v-else
+        class="hero-image"
+        :style="{ backgroundImage: backgroundImage ? `url(${backgroundImage})` : undefined }"
+      >
+        <!-- Lazy loaded image for better performance -->
+        <img
+          v-if="backgroundImage"
+          :src="backgroundImage"
+          :alt="title"
+          loading="lazy"
+          class="hero-image-lazy"
+        />
+      </div>
+      
+      <!-- Animated overlay gradient -->
+      <div class="hero-overlay" :class="{ 'overlay-light': overlayLight }"></div>
+      
+      <!-- Animated particles/bubbles effect -->
+      <div class="hero-particles">
+        <div v-for="i in 20" :key="i" class="particle" :style="getParticleStyle(i)"></div>
+      </div>
+    </div>
       <div class="gradient-overlay"></div>
       <div class="animated-shapes">
         <div class="shape shape-1"></div>
@@ -84,6 +122,9 @@ interface Props {
   secondaryButtonText?: string
   showStats?: boolean
   stats?: Array<{ value: string; label: string }>
+  backgroundImage?: string
+  videoUrl?: string
+  overlayLight?: boolean
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -95,7 +136,9 @@ const props = withDefaults(defineProps<Props>(), {
     { value: '24/7', label: 'Real-time Monitoring' },
     { value: '99.9%', label: 'System Uptime' },
     { value: '1000+', label: 'Sensors Connected' }
-  ]
+  ],
+  backgroundImage: 'https://images.unsplash.com/photo-1559827260-dc66d52bef19?q=80&w=2070&auto=format&fit=crop',
+  overlayLight: false
 })
 
 // Emits
@@ -108,6 +151,22 @@ const handlePrimaryAction = () => {
 
 const handleSecondaryAction = () => {
   emit('secondary-action')
+}
+
+// Particle animation helper
+const getParticleStyle = (index: number) => {
+  const delay = Math.random() * 5
+  const duration = 8 + Math.random() * 12
+  const size = 4 + Math.random() * 8
+  const left = Math.random() * 100
+  
+  return {
+    left: `${left}%`,
+    width: `${size}px`,
+    height: `${size}px`,
+    animationDelay: `${delay}s`,
+    animationDuration: `${duration}s`
+  }
 }
 
 const scrollToContent = () => {
@@ -162,33 +221,75 @@ onMounted(() => {
 .hero-background {
   position: absolute;
   inset: 0;
-  background: linear-gradient(
-    135deg,
-    #f8f9fa 0%,
-    #e9ecef 50%,
-    #dee2e6 100%
-  );
+  z-index: 0;
 
-  .gradient-overlay {
+  .hero-video,
+  .hero-image {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .hero-image {
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+  }
+
+  .hero-image-lazy {
+    opacity: 0;
+    animation: fadeIn 1s ease-in-out 0.3s forwards;
+  }
+
+  .hero-video {
+    filter: brightness(0.85);
+  }
+
+  .hero-overlay {
     position: absolute;
     inset: 0;
     background: linear-gradient(
       135deg,
-      rgba(0, 135, 255, 0.05) 0%,
-      rgba(0, 195, 175, 0.05) 100%
+      rgba(0, 10, 30, 0.85) 0%,
+      rgba(0, 60, 120, 0.75) 50%,
+      rgba(0, 100, 150, 0.65) 100%
     );
+    backdrop-filter: blur(2px);
+
+    &.overlay-light {
+      background: linear-gradient(
+        135deg,
+        rgba(255, 255, 255, 0.9) 0%,
+        rgba(240, 250, 255, 0.85) 100%
+      );
+    }
   }
 
-  .animated-shapes {
+  .hero-particles {
     position: absolute;
     inset: 0;
     overflow: hidden;
+    pointer-events: none;
 
-    .shape {
+    .particle {
       position: absolute;
+      bottom: -20px;
+      background: rgba(255, 255, 255, 0.3);
       border-radius: 50%;
-      filter: blur(60px);
-      opacity: 0.3;
+      animation: floatUp 15s infinite ease-in-out;
+      will-change: transform, opacity;
+
+      &:nth-child(odd) {
+        animation-timing-function: ease-in-out;
+      }
+
+      &:nth-child(even) {
+        animation-timing-function: cubic-bezier(0.42, 0, 0.58, 1);
+      }
+    }
+  }
       animation: float 20s ease-in-out infinite;
 
       &-1 {
@@ -420,10 +521,93 @@ onMounted(() => {
   cursor: pointer;
   opacity: 0.6;
   transition: opacity var(--transition-base);
+  z-index: 10;
 
   &:hover {
     opacity: 1;
   }
+
+  @media (max-width: 768px) {
+    display: none;
+  }
+}
+
+.scroll-icon {
+  width: 24px;
+  height: 40px;
+  border: 2px solid currentColor;
+  border-radius: 12px;
+  position: relative;
+
+  span {
+    position: absolute;
+    top: 8px;
+    left: 50%;
+    width: 4px;
+    height: 8px;
+    background: currentColor;
+    border-radius: 2px;
+    transform: translateX(-50%);
+    animation: scrollDown 2s infinite;
+  }
+}
+
+.scroll-text {
+  font-size: var(--font-size-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  font-weight: var(--font-weight-semibold);
+}
+
+// Performance-optimized animations
+@keyframes floatUp {
+  0% {
+    transform: translateY(0) translateX(0) scale(1);
+    opacity: 0;
+  }
+  10% {
+    opacity: 0.4;
+  }
+  50% {
+    opacity: 0.6;
+    transform: translateY(-50vh) translateX(20px) scale(1.2);
+  }
+  90% {
+    opacity: 0.3;
+  }
+  100% {
+    transform: translateY(-100vh) translateX(-20px) scale(0.8);
+    opacity: 0;
+  }
+}
+
+@keyframes fadeIn {
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes scrollDown {
+  0% {
+    transform: translateX(-50%) translateY(0);
+    opacity: 1;
+  }
+  100% {
+    transform: translateX(-50%) translateY(20px);
+    opacity: 0;
+  }
+}
+
+// Hardware acceleration hints for better performance
+.hero-video,
+.hero-image,
+.particle {
+  will-change: transform;
+  transform: translateZ(0);
+  backface-visibility: hidden;
+  perspective: 1000px;
+}
+
 
   .scroll-icon {
     width: 24px;

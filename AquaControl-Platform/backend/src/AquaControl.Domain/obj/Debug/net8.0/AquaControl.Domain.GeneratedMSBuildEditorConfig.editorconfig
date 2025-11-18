@@ -8,6 +8,6 @@ build_property.PlatformNeutralAssembly =
 build_property.EnforceExtendedAnalyzerRules = 
 build_property._SupportedPlatformList = Linux,macOS,Windows
 build_property.RootNamespace = AquaControl.Domain
-build_property.ProjectDir = /home/saidul/Desktop/AquaCulturePlatform/AquaControl-Platform/backend/src/AquaControl.Domain/
+build_property.ProjectDir = /home/saidul/Desktop/Portfolio/AquaCulturePlatform/AquaControl-Platform/backend/src/AquaControl.Domain/
 build_property.EnableComHosting = 
 build_property.EnableGeneratedComInterfaceComImportInterop = 

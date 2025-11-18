@@ -1,0 +1,285 @@
+@startuml ClassDiagram
+!theme plain
+skinparam linetype ortho
+skinparam shadowing false
+skinparam roundcorner 15
+skinparam classAttributeIconSize 0
+skinparam defaultFontSize 11
+skinparam classFontSize 11
+skinparam packageFontSize 13
+skinparam packageFontStyle bold
+skinparam arrowThickness 1.5
+skinparam arrowColor #1976D2
+skinparam minClassWidth 100
+
+title AquaControl Platform - System Architecture
+
+skinparam package {
+    BackgroundColor<<Domain>> #E3F2FD
+    BackgroundColor<<Application>> #E8F5E9
+    BackgroundColor<<Infrastructure>> #FFF3E0
+    BackgroundColor<<API>> #F3E5F5
+    BackgroundColor<<Frontend>> #E8EAF6
+    BorderColor #1976D2
+    BorderThickness 2
+}
+
+skinparam class {
+    BackgroundColor<<Aggregate>> #BBDEFB
+    BackgroundColor<<Service>> #C8E6C9
+    BackgroundColor<<Controller>> #F8BBD0
+    BackgroundColor<<Repository>> #B2DFDB
+    BackgroundColor<<Store>> #CE93D8
+    BackgroundColor<<View>> #90CAF9
+    BorderThickness 1
+}
+
+' ============================================
+' DOMAIN LAYER
+' ============================================
+package "Domain Layer" <<Domain>> {
+    
+    class User <<Aggregate>> {
+        +Username: string
+        +Email: string
+        +Roles: string[]
+        +IsActive: bool
+        --
+        +VerifyPassword(): bool
+    }
+    
+    class Tank <<Aggregate>> {
+        +Name: string
+        +TankType: TankType
+        +Status: TankStatus
+        --
+        +AddSensor(): void
+        +Activate(): void
+    }
+    
+    class Sensor {
+        +Name: string
+        +SensorType: SensorType
+        +LastReading: decimal?
+        --
+        +UpdateReading(): void
+    }
+    
+    class RefreshToken {
+        +Token: string
+        +ExpiresAt: DateTime
+        +IsRevoked: bool
+    }
+}
+
+' ============================================
+' APPLICATION LAYER
+' ============================================
+package "Application Layer" <<Application>> {
+    
+    interface IAuthenticationService <<Service>> {
+        +AuthenticateAsync(): Task
+        +HashPassword(): string
+    }
+    
+    interface ITokenService <<Service>> {
+        +GenerateTokensAsync(): Task
+        +RefreshTokenAsync(): Task
+    }
+    
+    class CreateTankCommand {
+        +Name: string
+        +Capacity: decimal
+        +TankType: TankType
+    }
+    
+    class CreateTankHandler <<Service>> {
+        +Handle(): Task<Guid>
+    }
+    
+    class GetTanksQuery {
+        +SearchTerm: string?
+        +Page: int
+    }
+    
+    class GetTanksHandler <<Service>> {
+        +Handle(): Task<PagedResult>
+    }
+}
+
+' ============================================
+' INFRASTRUCTURE LAYER
+' ============================================
+package "Infrastructure Layer" <<Infrastructure>> {
+    
+    class ApplicationDbContext {
+        +Users: DbSet<User>
+        +RefreshTokens: DbSet
+    }
+    
+    class ReadModelDbContext {
+        +Tanks: DbSet
+        +Sensors: DbSet
+    }
+    
+    class TimeSeriesDbContext {
+        +SensorReadings: DbSet
+        +Alerts: DbSet
+    }
+    
+    class UserRepository <<Repository>> {
+        +GetByUsernameAsync(): Task
+        +AddAsync(): Task
+    }
+    
+    class TankRepository <<Repository>> {
+        +GetByIdAsync(): Task
+        +GetAllAsync(): Task
+    }
+    
+    class RefreshTokenRepository <<Repository>> {
+        +GetByTokenAsync(): Task
+        +AddAsync(): Task
+    }
+    
+    class AuthenticationService <<Service>> {
+        +AuthenticateAsync(): Task
+    }
+    
+    class TokenService <<Service>> {
+        +GenerateTokensAsync(): Task
+    }
+}
+
+' ============================================
+' API LAYER
+' ============================================
+package "API Layer" <<API>> {
+    
+    class AuthController <<Controller>> {
+        +Login(): Task
+        +RefreshToken(): Task
+        +Logout(): Task
+    }
+    
+    class TanksController <<Controller>> {
+        +GetTanks(): Task
+        +CreateTank(): Task
+        +UpdateTank(): Task
+    }
+    
+    class SecurityMiddleware {
+        +InvokeAsync(): Task
+    }
+    
+    class ExceptionMiddleware {
+        +InvokeAsync(): Task
+    }
+}
+
+' ============================================
+' FRONTEND LAYER
+' ============================================
+package "Frontend Layer (Vue.js 3)" <<Frontend>> {
+    
+    class AuthStore <<Store>> {
+        +token: string?
+        +user: User?
+        --
+        +login(): Promise
+        +logout(): Promise
+    }
+    
+    class TankStore <<Store>> {
+        +tanks: Tank[]
+        --
+        +fetchTanks(): Promise
+        +createTank(): Promise
+    }
+    
+    class AlertStore <<Store>> {
+        +alerts: Alert[]
+        --
+        +fetchAlerts(): Promise
+    }
+    
+    class DashboardView <<View>> {
+        +refreshData(): Promise
+    }
+    
+    class HttpClient {
+        +get<T>(): Promise
+        +post<T>(): Promise
+    }
+    
+    class AuthService {
+        +login(): Promise
+    }
+    
+    class TankService {
+        +getTanks(): Promise
+    }
+}
+
+' ============================================
+' DOMAIN RELATIONSHIPS
+' ============================================
+User ||--o{ RefreshToken : "has"
+Tank o-- Sensor : "contains"
+
+' ============================================
+' APPLICATION LAYER RELATIONSHIPS
+' ============================================
+IAuthenticationService <|.. AuthenticationService : "implements"
+ITokenService <|.. TokenService : "implements"
+CreateTankCommand --> CreateTankHandler : "handled by"
+GetTanksQuery --> GetTanksHandler : "handled by"
+
+' ============================================
+' INFRASTRUCTURE LAYER RELATIONSHIPS
+' ============================================
+AuthenticationService --> UserRepository : "uses"
+TokenService --> RefreshTokenRepository : "uses"
+UserRepository --> ApplicationDbContext : "uses"
+TankRepository --> ReadModelDbContext : "uses"
+RefreshTokenRepository --> ApplicationDbContext : "uses"
+CreateTankHandler --> TankRepository : "uses"
+GetTanksHandler --> TankRepository : "uses"
+
+' ============================================
+' API LAYER RELATIONSHIPS
+' ============================================
+AuthController --> IAuthenticationService : "uses"
+AuthController --> ITokenService : "uses"
+TanksController --> CreateTankHandler : "uses"
+TanksController --> GetTanksHandler : "uses"
+AuthController ..> SecurityMiddleware : "protected by"
+TanksController ..> SecurityMiddleware : "protected by"
+AuthController ..> ExceptionMiddleware : "handled by"
+TanksController ..> ExceptionMiddleware : "handled by"
+
+' ============================================
+' FRONTEND LAYER RELATIONSHIPS
+' ============================================
+DashboardView --> TankStore : "uses"
+DashboardView --> AlertStore : "uses"
+DashboardView --> AuthStore : "uses"
+AuthStore --> AuthService : "uses"
+TankStore --> TankService : "uses"
+AuthService --> HttpClient : "uses"
+TankService --> HttpClient : "uses"
+
+' ============================================
+' CROSS-LAYER COMMUNICATION
+' ============================================
+HttpClient ..> AuthController : "HTTP REST"
+HttpClient ..> TanksController : "HTTP REST"
+
+' ============================================
+' DOMAIN TO INFRASTRUCTURE
+' ============================================
+UserRepository ..> User : "manages"
+TankRepository ..> Tank : "manages"
+RefreshTokenRepository ..> RefreshToken : "manages"
+
+@enduml

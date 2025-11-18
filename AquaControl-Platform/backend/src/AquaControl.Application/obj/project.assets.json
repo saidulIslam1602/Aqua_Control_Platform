@@ -602,11 +602,11 @@
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "/home/saidul/Desktop/AquaCulturePlatform/AquaControl-Platform/backend/src/AquaControl.Application/AquaControl.Application.csproj",
+      "projectUniqueName": "/home/saidul/Desktop/Portfolio/AquaCulturePlatform/AquaControl-Platform/backend/src/AquaControl.Application/AquaControl.Application.csproj",
       "projectName": "AquaControl.Application",
-      "projectPath": "/home/saidul/Desktop/AquaCulturePlatform/AquaControl-Platform/backend/src/AquaControl.Application/AquaControl.Application.csproj",
+      "projectPath": "/home/saidul/Desktop/Portfolio/AquaCulturePlatform/AquaControl-Platform/backend/src/AquaControl.Application/AquaControl.Application.csproj",
       "packagesPath": "/home/saidul/.nuget/packages/",
-      "outputPath": "/home/saidul/Desktop/AquaCulturePlatform/AquaControl-Platform/backend/src/AquaControl.Application/obj/",
+      "outputPath": "/home/saidul/Desktop/Portfolio/AquaCulturePlatform/AquaControl-Platform/backend/src/AquaControl.Application/obj/",
       "projectStyle": "PackageReference",
       "configFilePaths": [
         "/home/saidul/.nuget/NuGet/NuGet.Config"
@@ -621,8 +621,8 @@
         "net8.0": {
           "targetAlias": "net8.0",
           "projectReferences": {
-            "/home/saidul/Desktop/AquaCulturePlatform/AquaControl-Platform/backend/src/AquaControl.Domain/AquaControl.Domain.csproj": {
-              "projectPath": "/home/saidul/Desktop/AquaCulturePlatform/AquaControl-Platform/backend/src/AquaControl.Domain/AquaControl.Domain.csproj"
+            "/home/saidul/Desktop/Portfolio/AquaCulturePlatform/AquaControl-Platform/backend/src/AquaControl.Domain/AquaControl.Domain.csproj": {
+              "projectPath": "/home/saidul/Desktop/Portfolio/AquaCulturePlatform/AquaControl-Platform/backend/src/AquaControl.Domain/AquaControl.Domain.csproj"
             }
           }
         }

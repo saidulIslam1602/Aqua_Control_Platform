@@ -8092,11 +8092,11 @@
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "/home/saidul/Desktop/AquaCulturePlatform/AquaControl-Platform/backend/src/AquaControl.API/AquaControl.API.csproj",
+      "projectUniqueName": "/home/saidul/Desktop/Portfolio/AquaCulturePlatform/AquaControl-Platform/backend/src/AquaControl.API/AquaControl.API.csproj",
       "projectName": "AquaControl.API",
-      "projectPath": "/home/saidul/Desktop/AquaCulturePlatform/AquaControl-Platform/backend/src/AquaControl.API/AquaControl.API.csproj",
+      "projectPath": "/home/saidul/Desktop/Portfolio/AquaCulturePlatform/AquaControl-Platform/backend/src/AquaControl.API/AquaControl.API.csproj",
       "packagesPath": "/home/saidul/.nuget/packages/",
-      "outputPath": "/home/saidul/Desktop/AquaCulturePlatform/AquaControl-Platform/backend/src/AquaControl.API/obj/",
+      "outputPath": "/home/saidul/Desktop/Portfolio/AquaCulturePlatform/AquaControl-Platform/backend/src/AquaControl.API/obj/",
       "projectStyle": "PackageReference",
       "configFilePaths": [
         "/home/saidul/.nuget/NuGet/NuGet.Config"
@@ -8111,11 +8111,11 @@
         "net8.0": {
           "targetAlias": "net8.0",
           "projectReferences": {
-            "/home/saidul/Desktop/AquaCulturePlatform/AquaControl-Platform/backend/src/AquaControl.Application/AquaControl.Application.csproj": {
-              "projectPath": "/home/saidul/Desktop/AquaCulturePlatform/AquaControl-Platform/backend/src/AquaControl.Application/AquaControl.Application.csproj"
+            "/home/saidul/Desktop/Portfolio/AquaCulturePlatform/AquaControl-Platform/backend/src/AquaControl.Application/AquaControl.Application.csproj": {
+              "projectPath": "/home/saidul/Desktop/Portfolio/AquaCulturePlatform/AquaControl-Platform/backend/src/AquaControl.Application/AquaControl.Application.csproj"
             },
-            "/home/saidul/Desktop/AquaCulturePlatform/AquaControl-Platform/backend/src/AquaControl.Infrastructure/AquaControl.Infrastructure.csproj": {
-              "projectPath": "/home/saidul/Desktop/AquaCulturePlatform/AquaControl-Platform/backend/src/AquaControl.Infrastructure/AquaControl.Infrastructure.csproj"
+            "/home/saidul/Desktop/Portfolio/AquaCulturePlatform/AquaControl-Platform/backend/src/AquaControl.Infrastructure/AquaControl.Infrastructure.csproj": {
+              "projectPath": "/home/saidul/Desktop/Portfolio/AquaCulturePlatform/AquaControl-Platform/backend/src/AquaControl.Infrastructure/AquaControl.Infrastructure.csproj"
             }
           }
         }
