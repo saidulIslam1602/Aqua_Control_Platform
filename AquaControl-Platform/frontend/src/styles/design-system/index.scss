@@ -1,0 +1,282 @@
+/**
+ * Modern Design System Entry Point
+ * Import this file to use the complete design system
+ */
+
+// Core Design Tokens
+@import './tokens.scss';
+
+// Typography System
+@import './typography.scss';
+
+// Animation Utilities
+@import './animations.scss';
+
+// ========================================
+// Global Modern Styles
+// ========================================
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+}
+
+// ========================================
+// Layout Utilities
+// ========================================
+
+.container {
+  max-width: var(--container-max-width);
+  margin: 0 auto;
+  padding: 0 var(--container-padding);
+}
+
+.section {
+  padding: var(--section-spacing-md) 0;
+
+  &--sm {
+    padding: var(--section-spacing-sm) 0;
+  }
+
+  &--lg {
+    padding: var(--section-spacing-lg) 0;
+  }
+}
+
+// ========================================
+// Grid System
+// ========================================
+
+.grid {
+  display: grid;
+  gap: var(--space-6);
+
+  &--2 {
+    grid-template-columns: repeat(2, 1fr);
+    
+    @media (max-width: 768px) {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  &--3 {
+    grid-template-columns: repeat(3, 1fr);
+    
+    @media (max-width: 1024px) {
+      grid-template-columns: repeat(2, 1fr);
+    }
+    
+    @media (max-width: 640px) {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  &--4 {
+    grid-template-columns: repeat(4, 1fr);
+    
+    @media (max-width: 1200px) {
+      grid-template-columns: repeat(3, 1fr);
+    }
+    
+    @media (max-width: 768px) {
+      grid-template-columns: repeat(2, 1fr);
+    }
+    
+    @media (max-width: 480px) {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  &--auto-fit {
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  }
+
+  &--auto-fill {
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  }
+}
+
+// ========================================
+// Flex Utilities
+// ========================================
+
+.flex {
+  display: flex;
+
+  &--center {
+    align-items: center;
+    justify-content: center;
+  }
+
+  &--between {
+    justify-content: space-between;
+  }
+
+  &--wrap {
+    flex-wrap: wrap;
+  }
+
+  &--column {
+    flex-direction: column;
+  }
+}
+
+// ========================================
+// Spacing Utilities
+// ========================================
+
+@each $size in (0, 1, 2, 3, 4, 5, 6, 8, 10, 12, 16, 20, 24, 32) {
+  .m-#{$size} { margin: var(--space-#{$size}); }
+  .mt-#{$size} { margin-top: var(--space-#{$size}); }
+  .mr-#{$size} { margin-right: var(--space-#{$size}); }
+  .mb-#{$size} { margin-bottom: var(--space-#{$size}); }
+  .ml-#{$size} { margin-left: var(--space-#{$size}); }
+  .mx-#{$size} { 
+    margin-left: var(--space-#{$size}); 
+    margin-right: var(--space-#{$size}); 
+  }
+  .my-#{$size} { 
+    margin-top: var(--space-#{$size}); 
+    margin-bottom: var(--space-#{$size}); 
+  }
+
+  .p-#{$size} { padding: var(--space-#{$size}); }
+  .pt-#{$size} { padding-top: var(--space-#{$size}); }
+  .pr-#{$size} { padding-right: var(--space-#{$size}); }
+  .pb-#{$size} { padding-bottom: var(--space-#{$size}); }
+  .pl-#{$size} { padding-left: var(--space-#{$size}); }
+  .px-#{$size} { 
+    padding-left: var(--space-#{$size}); 
+    padding-right: var(--space-#{$size}); 
+  }
+  .py-#{$size} { 
+    padding-top: var(--space-#{$size}); 
+    padding-bottom: var(--space-#{$size}); 
+  }
+}
+
+// ========================================
+// Visual Utilities
+// ========================================
+
+.rounded {
+  &--sm { border-radius: var(--border-radius-sm); }
+  &--md { border-radius: var(--border-radius-md); }
+  &--lg { border-radius: var(--border-radius-lg); }
+  &--xl { border-radius: var(--border-radius-xl); }
+  &--2xl { border-radius: var(--border-radius-2xl); }
+  &--full { border-radius: var(--border-radius-full); }
+}
+
+.shadow {
+  &--xs { box-shadow: var(--shadow-xs); }
+  &--sm { box-shadow: var(--shadow-sm); }
+  &--md { box-shadow: var(--shadow-md); }
+  &--lg { box-shadow: var(--shadow-lg); }
+  &--xl { box-shadow: var(--shadow-xl); }
+  &--2xl { box-shadow: var(--shadow-2xl); }
+  &--inner { box-shadow: var(--shadow-inner); }
+}
+
+// ========================================
+// Background Utilities
+// ========================================
+
+.bg {
+  &--primary { background-color: var(--color-bg-primary); }
+  &--secondary { background-color: var(--color-bg-secondary); }
+  &--tertiary { background-color: var(--color-bg-tertiary); }
+  &--dark { background-color: var(--color-bg-dark); }
+  
+  &--gradient {
+    background: linear-gradient(
+      135deg,
+      var(--color-primary-500),
+      var(--color-secondary-500)
+    );
+  }
+  
+  &--gradient-subtle {
+    background: linear-gradient(
+      135deg,
+      var(--color-primary-50),
+      var(--color-secondary-50)
+    );
+  }
+}
+
+// ========================================
+// Text Utilities
+// ========================================
+
+.text {
+  &--primary { color: var(--color-text-primary); }
+  &--secondary { color: var(--color-text-secondary); }
+  &--tertiary { color: var(--color-text-tertiary); }
+  &--inverse { color: var(--color-text-inverse); }
+  
+  &--center { text-align: center; }
+  &--left { text-align: left; }
+  &--right { text-align: right; }
+  
+  &--xs { font-size: var(--font-size-xs); }
+  &--sm { font-size: var(--font-size-sm); }
+  &--base { font-size: var(--font-size-base); }
+  &--lg { font-size: var(--font-size-lg); }
+  &--xl { font-size: var(--font-size-xl); }
+  &--2xl { font-size: var(--font-size-2xl); }
+  &--3xl { font-size: var(--font-size-3xl); }
+}
+
+// ========================================
+// Display Utilities
+// ========================================
+
+.hidden { display: none; }
+.block { display: block; }
+.inline-block { display: inline-block; }
+.flex { display: flex; }
+.grid { display: grid; }
+
+@media (max-width: 640px) {
+  .hidden-mobile { display: none; }
+}
+
+@media (max-width: 1024px) {
+  .hidden-tablet { display: none; }
+}
+
+@media (min-width: 1025px) {
+  .hidden-desktop { display: none; }
+}
+
+// ========================================
+// Accessibility
+// ========================================
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}
+
+.focus-visible {
+  &:focus-visible {
+    outline: 2px solid var(--color-primary-500);
+    outline-offset: 2px;
+  }
+}

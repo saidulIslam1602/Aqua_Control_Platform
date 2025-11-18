@@ -4,6 +4,7 @@ import type { RouteRecordRaw } from 'vue-router'
 
 // Lazy load components
 const DashboardView = () => import('@/views/dashboard/DashboardView.vue')
+const ModernDashboardView = () => import('@/views/dashboard/ModernDashboardView.vue')
 const TanksView = () => import('@/views/TankList.vue')
 const TankDetailView = () => import('@/views/TankDetail.vue')
 const SensorsView = () => import('@/views/sensor/SensorsView.vue')
@@ -22,6 +23,12 @@ const routes: RouteRecordRaw[] = [
     name: 'Dashboard',
     component: DashboardView,
     meta: { requiresAuth: true, title: 'Dashboard' }
+  },
+  {
+    path: '/modern-dashboard',
+    name: 'ModernDashboard',
+    component: ModernDashboardView,
+    meta: { requiresAuth: true, title: 'Modern Dashboard' }
   },
   {
     path: '/tanks',

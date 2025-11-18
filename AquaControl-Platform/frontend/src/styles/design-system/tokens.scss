@@ -1,0 +1,233 @@
+/**
+ * Design System Tokens
+ * Inspired by modern aquaculture industry design (AKVA Group reference)
+ * Non-breaking: These tokens will be used in new components while old styles remain intact
+ */
+
+// ========================================
+// Color Palette - Modern Ocean/Tech Theme
+// ========================================
+
+:root {
+  // Primary Colors - Ocean Blue Gradient
+  --color-primary-50: #e6f3ff;
+  --color-primary-100: #cce7ff;
+  --color-primary-200: #99cfff;
+  --color-primary-300: #66b7ff;
+  --color-primary-400: #339fff;
+  --color-primary-500: #0087ff;  // Main brand color
+  --color-primary-600: #006ecc;
+  --color-primary-700: #005299;
+  --color-primary-800: #003766;
+  --color-primary-900: #001b33;
+
+  // Secondary Colors - Aqua/Teal
+  --color-secondary-50: #e6f9f7;
+  --color-secondary-100: #ccf3ef;
+  --color-secondary-200: #99e7df;
+  --color-secondary-300: #66dbcf;
+  --color-secondary-400: #33cfbf;
+  --color-secondary-500: #00c3af;  // Accent color
+  --color-secondary-600: #009c8c;
+  --color-secondary-700: #007569;
+  --color-secondary-800: #004e46;
+  --color-secondary-900: #002723;
+
+  // Neutral Colors - Modern Grays
+  --color-neutral-50: #f8f9fa;
+  --color-neutral-100: #f1f3f5;
+  --color-neutral-200: #e9ecef;
+  --color-neutral-300: #dee2e6;
+  --color-neutral-400: #ced4da;
+  --color-neutral-500: #adb5bd;
+  --color-neutral-600: #868e96;
+  --color-neutral-700: #495057;
+  --color-neutral-800: #343a40;
+  --color-neutral-900: #212529;
+
+  // Semantic Colors
+  --color-success-light: #d1f4dd;
+  --color-success: #10b981;
+  --color-success-dark: #059669;
+  
+  --color-warning-light: #fef3c7;
+  --color-warning: #f59e0b;
+  --color-warning-dark: #d97706;
+  
+  --color-error-light: #fee2e2;
+  --color-error: #ef4444;
+  --color-error-dark: #dc2626;
+  
+  --color-info-light: #dbeafe;
+  --color-info: #3b82f6;
+  --color-info-dark: #2563eb;
+
+  // Background Colors
+  --color-bg-primary: #ffffff;
+  --color-bg-secondary: #f8f9fa;
+  --color-bg-tertiary: #f1f3f5;
+  --color-bg-dark: #0a1929;
+  --color-bg-overlay: rgba(10, 25, 41, 0.8);
+
+  // Text Colors
+  --color-text-primary: #212529;
+  --color-text-secondary: #495057;
+  --color-text-tertiary: #868e96;
+  --color-text-inverse: #ffffff;
+  --color-text-link: var(--color-primary-600);
+  --color-text-link-hover: var(--color-primary-700);
+
+  // ========================================
+  // Typography
+  // ========================================
+  
+  // Font Families
+  --font-family-primary: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', sans-serif;
+  --font-family-display: 'Outfit', 'Inter', sans-serif;
+  --font-family-mono: 'Fira Code', 'Consolas', monospace;
+
+  // Font Sizes (Fluid Typography)
+  --font-size-xs: clamp(0.75rem, 0.7rem + 0.25vw, 0.875rem);
+  --font-size-sm: clamp(0.875rem, 0.825rem + 0.25vw, 1rem);
+  --font-size-base: clamp(1rem, 0.95rem + 0.25vw, 1.125rem);
+  --font-size-lg: clamp(1.125rem, 1.05rem + 0.375vw, 1.25rem);
+  --font-size-xl: clamp(1.25rem, 1.15rem + 0.5vw, 1.5rem);
+  --font-size-2xl: clamp(1.5rem, 1.35rem + 0.75vw, 1.875rem);
+  --font-size-3xl: clamp(1.875rem, 1.65rem + 1.125vw, 2.25rem);
+  --font-size-4xl: clamp(2.25rem, 1.95rem + 1.5vw, 3rem);
+  --font-size-5xl: clamp(3rem, 2.55rem + 2.25vw, 3.75rem);
+
+  // Font Weights
+  --font-weight-light: 300;
+  --font-weight-normal: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
+  --font-weight-extrabold: 800;
+
+  // Line Heights
+  --line-height-tight: 1.2;
+  --line-height-snug: 1.375;
+  --line-height-normal: 1.5;
+  --line-height-relaxed: 1.625;
+  --line-height-loose: 2;
+
+  // ========================================
+  // Spacing Scale
+  // ========================================
+  
+  --space-0: 0;
+  --space-1: 0.25rem;   // 4px
+  --space-2: 0.5rem;    // 8px
+  --space-3: 0.75rem;   // 12px
+  --space-4: 1rem;      // 16px
+  --space-5: 1.25rem;   // 20px
+  --space-6: 1.5rem;    // 24px
+  --space-8: 2rem;      // 32px
+  --space-10: 2.5rem;   // 40px
+  --space-12: 3rem;     // 48px
+  --space-16: 4rem;     // 64px
+  --space-20: 5rem;     // 80px
+  --space-24: 6rem;     // 96px
+  --space-32: 8rem;     // 128px
+
+  // ========================================
+  // Borders & Radius
+  // ========================================
+  
+  --border-width-thin: 1px;
+  --border-width-medium: 2px;
+  --border-width-thick: 4px;
+
+  --border-radius-sm: 0.25rem;
+  --border-radius-md: 0.5rem;
+  --border-radius-lg: 0.75rem;
+  --border-radius-xl: 1rem;
+  --border-radius-2xl: 1.5rem;
+  --border-radius-full: 9999px;
+
+  // ========================================
+  // Shadows
+  // ========================================
+  
+  --shadow-xs: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --shadow-sm: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px -1px rgba(0, 0, 0, 0.1);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1);
+  --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+  --shadow-2xl: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+  --shadow-inner: inset 0 2px 4px 0 rgba(0, 0, 0, 0.05);
+
+  // ========================================
+  // Transitions & Animations
+  // ========================================
+  
+  --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-base: 300ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-slow: 500ms cubic-bezier(0.4, 0, 0.2, 1);
+  
+  --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-out: cubic-bezier(0, 0, 0.2, 1);
+  --ease-in: cubic-bezier(0.4, 0, 1, 1);
+  --ease-bounce: cubic-bezier(0.68, -0.55, 0.265, 1.55);
+
+  // ========================================
+  // Layout
+  // ========================================
+  
+  --container-max-width: 1440px;
+  --container-padding: var(--space-6);
+  
+  --section-spacing-sm: var(--space-16);
+  --section-spacing-md: var(--space-24);
+  --section-spacing-lg: var(--space-32);
+
+  // Z-index Scale
+  --z-dropdown: 1000;
+  --z-sticky: 1020;
+  --z-fixed: 1030;
+  --z-modal-backdrop: 1040;
+  --z-modal: 1050;
+  --z-popover: 1060;
+  --z-tooltip: 1070;
+
+  // ========================================
+  // Component Specific
+  // ========================================
+  
+  // Header
+  --header-height: 80px;
+  --header-bg: var(--color-bg-primary);
+  --header-shadow: var(--shadow-sm);
+  
+  // Card
+  --card-bg: var(--color-bg-primary);
+  --card-border: var(--color-neutral-200);
+  --card-radius: var(--border-radius-xl);
+  --card-shadow: var(--shadow-md);
+  --card-shadow-hover: var(--shadow-xl);
+  
+  // Button
+  --button-radius: var(--border-radius-lg);
+  --button-padding-x: var(--space-6);
+  --button-padding-y: var(--space-3);
+}
+
+// ========================================
+// Dark Mode Support (Future Enhancement)
+// ========================================
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-bg-primary: #0a1929;
+    --color-bg-secondary: #1a2332;
+    --color-bg-tertiary: #2a3342;
+    
+    --color-text-primary: #f8f9fa;
+    --color-text-secondary: #e9ecef;
+    --color-text-tertiary: #ced4da;
+    
+    --header-bg: #0a1929;
+    --card-bg: #1a2332;
+  }
+}

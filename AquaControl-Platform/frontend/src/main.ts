@@ -10,6 +10,9 @@ import router from './router'
 import { setupErrorReporting } from './utils/errorReporting'
 import { setupPerformanceMonitoring } from './utils/performanceMonitoring'
 
+// Import modern design system (non-breaking, uses scoped classes)
+import './styles/design-system/index.scss'
+
 // Environment configuration
 const isDevelopment = import.meta.env.DEV
 const isProduction = import.meta.env.PROD
